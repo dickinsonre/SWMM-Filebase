@@ -23,49 +23,68 @@ export function Sidebar() {
 
   const uniqueDirectories = Array.from(new Set(files.map(f => f.directory)));
 
+  const processFiles = (fileList: File[], source: 'file' | 'directory') => {
+    // Filter for .inp files
+    const inpFiles = fileList.filter(f => f.name.toLowerCase().endsWith('.inp'));
+    
+    const newFiles: InpFile[] = [];
+
+    inpFiles.forEach((file, index) => {
+      // For directory imports, use webkitRelativePath to determine structure
+      // For single files, default to "Imported Files"
+      let directory = "Imported Files";
+      
+      if (source === 'directory' && file.webkitRelativePath) {
+        const pathParts = file.webkitRelativePath.split('/');
+        // Remove filename to get directory path
+        if (pathParts.length > 1) {
+          directory = pathParts.slice(0, -1).join('/');
+        }
+      }
+
+      newFiles.push({
+        id: `imported-${Date.now()}-${index}`,
+        filename: file.name,
+        directory: directory,
+        size: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
+        lastModified: new Date(file.lastModified).toISOString().split('T')[0],
+        // Mock stats for the prototype
+        nodeCount: Math.floor(Math.random() * 500) + 50,
+        linkCount: Math.floor(Math.random() * 550) + 50,
+        subcatchmentCount: Math.floor(Math.random() * 100) + 10,
+        description: source === 'directory' ? "Imported via Directory Import" : "Manual File Import"
+      });
+    });
+
+    if (newFiles.length > 0) {
+      addFiles(newFiles);
+      toast({
+        title: "Import Successful",
+        description: `Successfully imported ${newFiles.length} .inp file${newFiles.length !== 1 ? 's' : ''}.`,
+      });
+    } else {
+      toast({
+        title: "No .inp files found",
+        description: "Please select valid SWMM5 .inp files.",
+        variant: "destructive"
+      });
+    }
+  };
+
   const handleDirectoryImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      const newFiles: InpFile[] = [];
-      const fileList = Array.from(e.target.files);
-      
-      // Filter for .inp files and create mock entries
-      const inpFiles = fileList.filter(f => f.name.toLowerCase().endsWith('.inp'));
-      
-      inpFiles.forEach((file, index) => {
-        // Extract directory name from webkitRelativePath if available, otherwise use a generic one
-        // webkitRelativePath looks like "folder/subfolder/file.inp"
-        const pathParts = file.webkitRelativePath ? file.webkitRelativePath.split('/') : ['Imported', file.name];
-        // Remove filename to get directory
-        const directory = pathParts.length > 1 ? pathParts.slice(0, -1).join('/') : "Imported Files";
-
-        newFiles.push({
-          id: `imported-${Date.now()}-${index}`,
-          filename: file.name,
-          directory: directory,
-          size: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
-          lastModified: new Date(file.lastModified).toISOString().split('T')[0],
-          // Mock stats for the prototype
-          nodeCount: Math.floor(Math.random() * 500) + 50,
-          linkCount: Math.floor(Math.random() * 550) + 50,
-          subcatchmentCount: Math.floor(Math.random() * 100) + 10,
-          description: "Imported via Directory Import"
-        });
-      });
-
-      if (newFiles.length > 0) {
-        addFiles(newFiles);
-        toast({
-          title: "Directory Imported",
-          description: `Successfully imported ${newFiles.length} .inp files from ${newFiles[0].directory}`,
-        });
-      } else {
-         toast({
-          title: "No .inp files found",
-          description: "The selected directory did not contain any .inp files.",
-          variant: "destructive"
-        });
-      }
+      processFiles(Array.from(e.target.files), 'directory');
     }
+    // Reset input value to allow re-selecting the same directory if needed
+    e.target.value = '';
+  };
+
+  const handleFileImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      processFiles(Array.from(e.target.files), 'file');
+    }
+    // Reset input value
+    e.target.value = '';
   };
 
   return (
@@ -104,13 +123,7 @@ export function Sidebar() {
           className="hidden" 
           accept=".inp" 
           multiple
-          onChange={(e) => {
-            // Logic for single/multiple file import similar to directory
-            // Simplified for brevity - reusing the directory logic partially
-             if (e.target.files && e.target.files.length > 0) {
-               // ... same processing logic
-             }
-          }} 
+          onChange={handleFileImport} 
         />
         <input 
           type="file" 
