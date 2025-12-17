@@ -1,27 +1,68 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { InpFile, mockInpFiles } from '@/lib/mock-data';
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import { InpFile } from '@/lib/api';
+import * as api from '@/lib/api';
 
 interface FileContextType {
   files: InpFile[];
-  addFiles: (newFiles: InpFile[]) => void;
-  removeFile: (id: string) => void;
+  loading: boolean;
+  error: string | null;
+  uploadFiles: (files: File[], directory?: string) => Promise<void>;
+  removeFile: (id: string) => Promise<void>;
+  refreshFiles: () => Promise<void>;
 }
 
 const FileContext = createContext<FileContextType | undefined>(undefined);
 
 export function FileProvider({ children }: { children: ReactNode }) {
-  const [files, setFiles] = useState<InpFile[]>(mockInpFiles);
+  const [files, setFiles] = useState<InpFile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const addFiles = (newFiles: InpFile[]) => {
-    setFiles((prev) => [...prev, ...newFiles]);
+  const refreshFiles = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await api.getAllInpFiles();
+      setFiles(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load files');
+      console.error('Error loading files:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const removeFile = (id: string) => {
-    setFiles((prev) => prev.filter((f) => f.id !== id));
+  const uploadFiles = async (filesToUpload: File[], directory?: string) => {
+    try {
+      setError(null);
+      await api.uploadInpFiles(filesToUpload, directory);
+      // Refresh the file list after upload
+      await refreshFiles();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to upload files');
+      throw err;
+    }
   };
+
+  const removeFile = async (id: string) => {
+    try {
+      setError(null);
+      await api.deleteInpFile(id);
+      // Remove from local state immediately for better UX
+      setFiles((prev) => prev.filter((f) => f.id !== id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete file');
+      throw err;
+    }
+  };
+
+  // Load files on mount
+  useEffect(() => {
+    refreshFiles();
+  }, []);
 
   return (
-    <FileContext.Provider value={{ files, addFiles, removeFile }}>
+    <FileContext.Provider value={{ files, loading, error, uploadFiles, removeFile, refreshFiles }}>
       {children}
     </FileContext.Provider>
   );

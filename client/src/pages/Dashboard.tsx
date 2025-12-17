@@ -2,16 +2,16 @@ import { useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { FileCard } from "@/components/FileCard";
 import { useFiles } from "@/context/FileContext";
-import { InpFile } from "@/lib/mock-data";
+import { InpFile } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Filter, SortAsc, Plus } from "lucide-react";
+import { Search, Filter, SortAsc, Plus, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 import heroBg from "@assets/generated_images/technical_hydrology_network_blueprint_abstract_background.png";
 
 export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState("");
-  const { files } = useFiles();
+  const { files, loading, error } = useFiles();
 
   // Group files by directory
   const groupedFiles = files.reduce((acc, file) => {
@@ -26,6 +26,34 @@ export default function Dashboard() {
      dir.toLowerCase().includes(searchQuery.toLowerCase()) || 
      groupedFiles[dir].some(f => f.filename.toLowerCase().includes(searchQuery.toLowerCase()))
   );
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen bg-background text-foreground font-sans">
+        <Sidebar />
+        <main className="flex-1 ml-64 p-8 flex items-center justify-center">
+          <div className="flex flex-col items-center gap-4">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-muted-foreground">Loading your models...</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex min-h-screen bg-background text-foreground font-sans">
+        <Sidebar />
+        <main className="flex-1 ml-64 p-8 flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-destructive mb-2">Error loading files</p>
+            <p className="text-muted-foreground text-sm">{error}</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen bg-background text-foreground font-sans">
@@ -73,6 +101,13 @@ export default function Dashboard() {
 
         {/* File Grid */}
         <div className="space-y-8">
+          {filteredDirectories.length === 0 && files.length === 0 && (
+            <div className="text-center py-20 border-2 border-dashed border-border/60 rounded-xl bg-muted/10">
+              <p className="text-muted-foreground mb-2">No files yet</p>
+              <p className="text-sm text-muted-foreground/70">Upload your first .inp file to get started</p>
+            </div>
+          )}
+
           {filteredDirectories.map((directory) => (
             <motion.div 
               key={directory}
@@ -98,7 +133,7 @@ export default function Dashboard() {
             </motion.div>
           ))}
 
-          {filteredDirectories.length === 0 && (
+          {filteredDirectories.length === 0 && files.length > 0 && (
             <div className="text-center py-20 border-2 border-dashed border-border/60 rounded-xl bg-muted/10">
               <p className="text-muted-foreground">No files found matching your search.</p>
               <Button variant="link" onClick={() => setSearchQuery("")}>Clear Search</Button>

@@ -5,15 +5,15 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { useFiles } from "@/context/FileContext";
-import { useRef } from "react";
-import { InpFile } from "@/lib/mock-data";
+import { useRef, useState } from "react";
 import { toast } from "@/hooks/use-toast";
 
 export function Sidebar() {
   const [location] = useLocation();
-  const { files, addFiles } = useFiles();
+  const { files, uploadFiles } = useFiles();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dirInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
 
   const navItems = [
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -21,76 +21,66 @@ export function Sidebar() {
     { href: "/settings", label: "Settings", icon: Settings },
   ];
 
-  const uniqueDirectories = Array.from(new Set(files.map(f => f.directory)));
+  const directoryCounts = files.reduce((acc, file) => {
+    acc[file.directory] = (acc[file.directory] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
 
-  const processFiles = (fileList: File[], source: 'file' | 'directory') => {
-    // Filter for .inp files
-    const inpFiles = fileList.filter(f => f.name.toLowerCase().endsWith('.inp'));
+  const uniqueDirectories = Object.keys(directoryCounts);
+
+  const handleFileUpload = async (fileList: FileList, source: 'file' | 'directory') => {
+    const inpFiles = Array.from(fileList).filter(f => f.name.toLowerCase().endsWith('.inp'));
     
-    const newFiles: InpFile[] = [];
-
-    inpFiles.forEach((file, index) => {
-      // For directory imports, use webkitRelativePath to determine structure
-      // For single files, default to "Imported Files"
-      let directory = "Imported Files";
-      
-      if (source === 'directory' && file.webkitRelativePath) {
-        const pathParts = file.webkitRelativePath.split('/');
-        // Remove filename to get directory path
-        if (pathParts.length > 1) {
-          directory = pathParts.slice(0, -1).join('/');
-        }
-      }
-
-      newFiles.push({
-        id: `imported-${Date.now()}-${index}`,
-        filename: file.name,
-        directory: directory,
-        size: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
-        lastModified: new Date(file.lastModified).toISOString().split('T')[0],
-        // Mock stats for the prototype
-        nodeCount: Math.floor(Math.random() * 500) + 50,
-        linkCount: Math.floor(Math.random() * 550) + 50,
-        subcatchmentCount: Math.floor(Math.random() * 100) + 10,
-        description: source === 'directory' ? "Imported via Directory Import" : "Manual File Import"
-      });
-    });
-
-    if (newFiles.length > 0) {
-      addFiles(newFiles);
-      toast({
-        title: "Import Successful",
-        description: `Successfully imported ${newFiles.length} .inp file${newFiles.length !== 1 ? 's' : ''}.`,
-      });
-    } else {
+    if (inpFiles.length === 0) {
       toast({
         title: "No .inp files found",
         description: "Please select valid SWMM5 .inp files.",
         variant: "destructive"
       });
+      return;
+    }
+
+    setUploading(true);
+    try {
+      // For directory imports, extract directory path from first file
+      let directory = "Imported Files";
+      if (source === 'directory' && inpFiles[0].webkitRelativePath) {
+        const pathParts = inpFiles[0].webkitRelativePath.split('/');
+        if (pathParts.length > 1) {
+          directory = pathParts.slice(0, -1).join('/');
+        }
+      }
+
+      await uploadFiles(inpFiles, directory);
+      
+      toast({
+        title: "Import Successful",
+        description: `Successfully imported ${inpFiles.length} .inp file${inpFiles.length !== 1 ? 's' : ''}.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Upload Failed",
+        description: error instanceof Error ? error.message : "Failed to upload files",
+        variant: "destructive"
+      });
+    } finally {
+      setUploading(false);
     }
   };
 
   const handleDirectoryImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      processFiles(Array.from(e.target.files), 'directory');
+      handleFileUpload(e.target.files, 'directory');
     }
-    // Reset input value to allow re-selecting the same directory if needed
     e.target.value = '';
   };
 
   const handleFileImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      processFiles(Array.from(e.target.files), 'file');
+      handleFileUpload(e.target.files, 'file');
     }
-    // Reset input value
     e.target.value = '';
   };
-
-  const directoryCounts = files.reduce((acc, file) => {
-    acc[file.directory] = (acc[file.directory] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
 
   return (
     <div className="w-64 border-r border-border bg-sidebar text-sidebar-foreground flex flex-col h-screen fixed left-0 top-0">
@@ -108,16 +98,18 @@ export function Sidebar() {
           <Button 
             className="w-full bg-primary text-primary-foreground hover:bg-primary/90 shadow-md text-xs gap-2 px-2"
             onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
           >
             <UploadCloud className="h-3.5 w-3.5" />
-            File
+            {uploading ? 'Uploading...' : 'File'}
           </Button>
           <Button 
             className="w-full bg-sidebar-accent text-sidebar-accent-foreground hover:bg-sidebar-accent/80 shadow-sm border border-sidebar-border text-xs gap-2 px-2"
             onClick={() => dirInputRef.current?.click()}
+            disabled={uploading}
           >
             <FolderInput className="h-3.5 w-3.5" />
-            Folder
+            {uploading ? 'Uploading...' : 'Folder'}
           </Button>
         </div>
 
@@ -147,15 +139,15 @@ export function Sidebar() {
             const isActive = location === item.href;
             return (
               <Link key={item.href} href={item.href}>
-                <a className={cn(
-                  "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                <span className={cn(
+                  "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer",
                   isActive 
                     ? "bg-sidebar-accent text-sidebar-accent-foreground" 
                     : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
                 )}>
                   <item.icon className="h-4 w-4" />
                   {item.label}
-                </a>
+                </span>
               </Link>
             );
           })}
