@@ -87,6 +87,11 @@ export function Sidebar() {
     e.target.value = '';
   };
 
+  const directoryCounts = files.reduce((acc, file) => {
+    acc[file.directory] = (acc[file.directory] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
   return (
     <div className="w-64 border-r border-border bg-sidebar text-sidebar-foreground flex flex-col h-screen fixed left-0 top-0">
       <div className="p-6 border-b border-sidebar-border/40">
@@ -178,8 +183,13 @@ export function Sidebar() {
                 size="sm"
                 className="w-full justify-start text-xs font-normal text-sidebar-foreground/70 h-auto py-1.5 px-2 hover:bg-sidebar-accent/30 hover:text-sidebar-accent-foreground truncate"
               >
-                <FolderOpen className="h-3 w-3 mr-2 shrink-0 opacity-70" />
-                <span className="truncate">{dir.split('/').pop()}</span>
+                <div className="flex items-center flex-1 min-w-0">
+                  <FolderOpen className="h-3 w-3 mr-2 shrink-0 opacity-70" />
+                  <span className="truncate">{dir.split('/').pop()}</span>
+                </div>
+                <span className="text-[10px] text-muted-foreground ml-2 opacity-60">
+                  {directoryCounts[dir]}
+                </span>
               </Button>
             ))}
           </div>
