@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { FileCard } from "@/components/FileCard";
-import { mockInpFiles, InpFile } from "@/lib/mock-data";
+import { useFiles } from "@/context/FileContext";
+import { InpFile } from "@/lib/mock-data";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, Filter, SortAsc, Plus } from "lucide-react";
@@ -10,7 +11,7 @@ import heroBg from "@assets/generated_images/technical_hydrology_network_bluepri
 
 export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [files, setFiles] = useState<InpFile[]>(mockInpFiles);
+  const { files } = useFiles();
 
   // Group files by directory
   const groupedFiles = files.reduce((acc, file) => {
