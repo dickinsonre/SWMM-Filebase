@@ -70,7 +70,7 @@ export default function Dashboard() {
               className="absolute inset-0 w-full h-full object-cover opacity-40 group-hover:scale-105 transition-transform duration-700"
             />
             <div className="absolute inset-0 z-20 flex flex-col justify-center px-8">
-              <h1 className="text-3xl font-bold text-white mb-2 tracking-tight">Project Dashboard</h1>
+              <h1 className="text-3xl font-bold text-white mb-2 tracking-tight">1729 SWMM5 Models</h1>
               <p className="text-blue-100 max-w-xl">
                 Manage your SWMM5 models. {files.length} active files across {Object.keys(groupedFiles).length} project directories.
               </p>
