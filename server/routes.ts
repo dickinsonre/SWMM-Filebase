@@ -132,6 +132,26 @@ export async function registerRoutes(
     }
   });
 
+  app.delete("/api/directories/:directory", async (req, res) => {
+    try {
+      const directory = decodeURIComponent(req.params.directory);
+      const filesToDelete = await storage.deleteDirectory(directory);
+      
+      for (const file of filesToDelete) {
+        try {
+          await objectStorageService.deleteInpFile(file.objectPath);
+        } catch (err) {
+          console.error(`Error deleting file from object storage: ${file.objectPath}`, err);
+        }
+      }
+      
+      res.json({ success: true, deletedCount: filesToDelete.length });
+    } catch (error) {
+      console.error('Error deleting directory:', error);
+      res.status(500).json({ error: 'Failed to delete directory' });
+    }
+  });
+
   return httpServer;
 }
 

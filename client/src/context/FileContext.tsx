@@ -8,6 +8,7 @@ interface FileContextType {
   error: string | null;
   uploadFiles: (files: File[], directory?: string) => Promise<void>;
   removeFile: (id: string) => Promise<void>;
+  removeDirectory: (directory: string) => Promise<void>;
   refreshFiles: () => Promise<void>;
 }
 
@@ -48,10 +49,20 @@ export function FileProvider({ children }: { children: ReactNode }) {
     try {
       setError(null);
       await api.deleteInpFile(id);
-      // Remove from local state immediately for better UX
       setFiles((prev) => prev.filter((f) => f.id !== id));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete file');
+      throw err;
+    }
+  };
+
+  const removeDirectory = async (directory: string) => {
+    try {
+      setError(null);
+      await api.deleteDirectory(directory);
+      setFiles((prev) => prev.filter((f) => f.directory !== directory));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete directory');
       throw err;
     }
   };
@@ -62,7 +73,7 @@ export function FileProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <FileContext.Provider value={{ files, loading, error, uploadFiles, removeFile, refreshFiles }}>
+    <FileContext.Provider value={{ files, loading, error, uploadFiles, removeFile, removeDirectory, refreshFiles }}>
       {children}
     </FileContext.Provider>
   );

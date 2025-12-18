@@ -59,3 +59,13 @@ export async function deleteInpFile(id: string): Promise<void> {
     throw new Error('Failed to delete file');
   }
 }
+
+export async function deleteDirectory(directory: string): Promise<void> {
+  const response = await fetch(`/api/directories/${encodeURIComponent(directory)}`, {
+    method: 'DELETE',
+  });
+  
+  if (!response.ok) {
+    throw new Error('Failed to delete directory');
+  }
+}

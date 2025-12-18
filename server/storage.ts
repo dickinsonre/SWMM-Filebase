@@ -13,6 +13,7 @@ export interface IStorage {
   createInpFile(file: InsertInpFile): Promise<InpFile>;
   deleteInpFile(id: string): Promise<void>;
   getInpFilesByDirectory(directory: string): Promise<InpFile[]>;
+  deleteDirectory(directory: string): Promise<InpFile[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -57,6 +58,12 @@ export class DatabaseStorage implements IStorage {
 
   async getInpFilesByDirectory(directory: string): Promise<InpFile[]> {
     return await db.select().from(inpFiles).where(eq(inpFiles.directory, directory));
+  }
+
+  async deleteDirectory(directory: string): Promise<InpFile[]> {
+    const filesToDelete = await this.getInpFilesByDirectory(directory);
+    await db.delete(inpFiles).where(eq(inpFiles.directory, directory));
+    return filesToDelete;
   }
 }
 

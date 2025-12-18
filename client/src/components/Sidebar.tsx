@@ -1,16 +1,27 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, BrainCircuit, Settings, FolderOpen, UploadCloud, Search, FolderInput, ChevronDown, ChevronRight } from "lucide-react";
+import { LayoutDashboard, BrainCircuit, Settings, FolderOpen, UploadCloud, Search, FolderInput, ChevronDown, ChevronRight, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { useFiles } from "@/context/FileContext";
 import { useRef, useState } from "react";
 import { toast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export function Sidebar() {
   const [location] = useLocation();
-  const { files, uploadFiles } = useFiles();
+  const { files, uploadFiles, removeDirectory } = useFiles();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dirInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -188,21 +199,65 @@ export function Sidebar() {
           <ScrollArea className="h-[300px] px-3">
             <div className="space-y-1">
               {uniqueDirectories.map((dir, i) => (
-                <Button
-                  key={i}
-                  variant="ghost"
-                  size="sm"
-                  className="w-full justify-start text-xs font-normal text-sidebar-foreground/70 h-auto py-1.5 px-2 hover:bg-sidebar-accent/30 hover:text-sidebar-accent-foreground truncate"
-                  data-testid={`directory-${i}`}
-                >
-                  <div className="flex items-center flex-1 min-w-0">
-                    <FolderOpen className="h-3 w-3 mr-2 shrink-0 opacity-70" />
-                    <span className="truncate">{dir.split('/').pop()}</span>
-                  </div>
-                  <span className="font-mono font-bold text-[10px] bg-primary text-white px-1.5 py-0.5 rounded ml-2" data-testid={`directory-count-${i}`}>
-                    {directoryCounts[dir]}
-                  </span>
-                </Button>
+                <div key={i} className="flex items-center group">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="flex-1 justify-start text-xs font-normal text-sidebar-foreground/70 h-auto py-1.5 px-2 hover:bg-sidebar-accent/30 hover:text-sidebar-accent-foreground truncate"
+                    data-testid={`directory-${i}`}
+                  >
+                    <div className="flex items-center flex-1 min-w-0">
+                      <FolderOpen className="h-3 w-3 mr-2 shrink-0 opacity-70" />
+                      <span className="truncate">{dir.split('/').pop()}</span>
+                    </div>
+                    <span className="font-mono font-bold text-[10px] bg-primary text-white px-1.5 py-0.5 rounded ml-2" data-testid={`directory-count-${i}`}>
+                      {directoryCounts[dir]}
+                    </span>
+                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10"
+                        data-testid={`delete-directory-${i}`}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Folder</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Are you sure you want to delete "{dir.split('/').pop()}" and all {directoryCounts[dir]} files inside it? This action cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          onClick={async () => {
+                            try {
+                              await removeDirectory(dir);
+                              toast({
+                                title: "Folder deleted",
+                                description: `Deleted ${directoryCounts[dir]} files from ${dir.split('/').pop()}`,
+                              });
+                            } catch (error) {
+                              toast({
+                                title: "Delete failed",
+                                description: error instanceof Error ? error.message : "Failed to delete folder",
+                                variant: "destructive"
+                              });
+                            }
+                          }}
+                        >
+                          Delete
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
               ))}
             </div>
           </ScrollArea>
