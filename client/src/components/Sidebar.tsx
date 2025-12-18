@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, BrainCircuit, Settings, FolderOpen, UploadCloud, Search, FolderInput } from "lucide-react";
+import { LayoutDashboard, BrainCircuit, Settings, FolderOpen, UploadCloud, Search, FolderInput, ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,7 @@ export function Sidebar() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dirInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [directoriesCollapsed, setDirectoriesCollapsed] = useState(false);
 
   const navItems = [
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -155,38 +156,57 @@ export function Sidebar() {
         </nav>
 
         <div className="mb-4 px-3">
-          <h2 className="text-xs font-semibold text-sidebar-foreground/50 uppercase tracking-wider mb-3">
-            Directories
-          </h2>
-          <div className="relative mb-3">
-             <Search className="absolute left-2 top-2.5 h-3 w-3 text-sidebar-foreground/40" />
-             <Input 
-               placeholder="Filter..." 
-               className="h-8 pl-7 text-xs bg-sidebar-accent/30 border-sidebar-border/50 text-sidebar-foreground placeholder:text-sidebar-foreground/30 focus-visible:ring-sidebar-ring"
-             />
-          </div>
+          <button 
+            onClick={() => setDirectoriesCollapsed(!directoriesCollapsed)}
+            className="flex items-center justify-between w-full text-xs font-semibold text-sidebar-foreground/50 uppercase tracking-wider mb-3 hover:text-sidebar-foreground/70 transition-colors"
+            data-testid="toggle-directories"
+          >
+            <div className="flex items-center gap-2">
+              {directoriesCollapsed ? (
+                <ChevronRight className="h-3 w-3" />
+              ) : (
+                <ChevronDown className="h-3 w-3" />
+              )}
+              <span>Directories</span>
+            </div>
+            <span className="font-mono text-[10px] bg-sidebar-accent/50 px-1.5 py-0.5 rounded" data-testid="total-file-count">
+              {files.length} files
+            </span>
+          </button>
+          {!directoriesCollapsed && (
+            <div className="relative mb-3">
+               <Search className="absolute left-2 top-2.5 h-3 w-3 text-sidebar-foreground/40" />
+               <Input 
+                 placeholder="Filter..." 
+                 className="h-8 pl-7 text-xs bg-sidebar-accent/30 border-sidebar-border/50 text-sidebar-foreground placeholder:text-sidebar-foreground/30 focus-visible:ring-sidebar-ring"
+               />
+            </div>
+          )}
         </div>
 
-        <ScrollArea className="h-[300px] px-3">
-          <div className="space-y-1">
-            {uniqueDirectories.map((dir, i) => (
-              <Button
-                key={i}
-                variant="ghost"
-                size="sm"
-                className="w-full justify-start text-xs font-normal text-sidebar-foreground/70 h-auto py-1.5 px-2 hover:bg-sidebar-accent/30 hover:text-sidebar-accent-foreground truncate"
-              >
-                <div className="flex items-center flex-1 min-w-0">
-                  <FolderOpen className="h-3 w-3 mr-2 shrink-0 opacity-70" />
-                  <span className="truncate">{dir.split('/').pop()}</span>
-                </div>
-                <span className="text-[10px] text-muted-foreground ml-2 opacity-60">
-                  {directoryCounts[dir]}
-                </span>
-              </Button>
-            ))}
-          </div>
-        </ScrollArea>
+        {!directoriesCollapsed && (
+          <ScrollArea className="h-[300px] px-3">
+            <div className="space-y-1">
+              {uniqueDirectories.map((dir, i) => (
+                <Button
+                  key={i}
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start text-xs font-normal text-sidebar-foreground/70 h-auto py-1.5 px-2 hover:bg-sidebar-accent/30 hover:text-sidebar-accent-foreground truncate"
+                  data-testid={`directory-${i}`}
+                >
+                  <div className="flex items-center flex-1 min-w-0">
+                    <FolderOpen className="h-3 w-3 mr-2 shrink-0 opacity-70" />
+                    <span className="truncate">{dir.split('/').pop()}</span>
+                  </div>
+                  <span className="text-[10px] text-muted-foreground ml-2 opacity-60">
+                    {directoryCounts[dir]}
+                  </span>
+                </Button>
+              ))}
+            </div>
+          </ScrollArea>
+        )}
       </div>
       
       <div className="mt-auto p-4 border-t border-sidebar-border/40">
