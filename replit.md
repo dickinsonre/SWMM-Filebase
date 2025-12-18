@@ -39,12 +39,19 @@ Key API endpoints:
 
 ### Data Storage
 - **Database**: PostgreSQL with Drizzle ORM
+- **Object Storage**: Replit Object Storage (Google Cloud Storage backend) for raw .inp file content
 - **Schema Location**: `shared/schema.ts`
 - **Migrations**: Drizzle Kit (`drizzle-kit push`)
 
 Database tables:
 - `users` - Basic user authentication (id, username, password)
-- `inp_files` - SWMM5 file storage (metadata + full file content as text)
+- `inp_files` - SWMM5 file metadata (filename, directory, counts, objectPath reference)
+
+Object Storage:
+- Raw .inp file content stored in Replit Object Storage bucket
+- Files stored at path: `/objects/inp-files/<uuid>-<filename>`
+- Object storage service: `server/objectStorage.ts`
+- ACL policies: `server/objectAcl.ts`
 
 ### INP File Parser
 A custom parser (`server/inp-parser.ts`) extracts metadata from SWMM5 `.inp` files by reading section headers and counting elements in sections like JUNCTIONS, CONDUITS, SUBCATCHMENTS, etc.

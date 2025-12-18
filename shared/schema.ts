@@ -13,13 +13,13 @@ export const inpFiles = pgTable("inp_files", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   filename: text("filename").notNull(),
   directory: text("directory").notNull(),
-  size: integer("size").notNull(), // size in bytes
+  size: integer("size").notNull(),
   lastModified: timestamp("last_modified").notNull(),
   nodeCount: integer("node_count").notNull().default(0),
   linkCount: integer("link_count").notNull().default(0),
   subcatchmentCount: integer("subcatchment_count").notNull().default(0),
   description: text("description"),
-  fileContent: text("file_content").notNull(), // Store the actual .inp file content
+  objectPath: text("object_path").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
