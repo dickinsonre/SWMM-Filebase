@@ -53,9 +53,10 @@ export function Sidebar() {
 
       await uploadFiles(inpFiles, directory);
       
+      const fileNames = inpFiles.map(f => f.name).join(', ');
       toast({
         title: "Import Successful",
-        description: `Successfully imported ${inpFiles.length} .inp file${inpFiles.length !== 1 ? 's' : ''}.`,
+        description: `Uploaded: ${fileNames}`,
       });
     } catch (error) {
       toast({
