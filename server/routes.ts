@@ -9,10 +9,11 @@ import multer from "multer";
 const upload = multer({ 
   storage: multer.memoryStorage(),
   fileFilter: (req, file, cb) => {
+    // Silently skip non-.inp files (don't throw error, just don't accept them)
     if (file.originalname.toLowerCase().endsWith('.inp')) {
       cb(null, true);
     } else {
-      cb(new Error('Only .inp files are allowed'));
+      cb(null, false); // Skip file without error
     }
   }
 });
