@@ -199,7 +199,7 @@ export function Sidebar() {
                     <FolderOpen className="h-3 w-3 mr-2 shrink-0 opacity-70" />
                     <span className="truncate">{dir.split('/').pop()}</span>
                   </div>
-                  <span className="text-[10px] text-muted-foreground ml-2 opacity-60">
+                  <span className="font-mono text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded ml-2" data-testid={`directory-count-${i}`}>
                     {directoryCounts[dir]}
                   </span>
                 </Button>
