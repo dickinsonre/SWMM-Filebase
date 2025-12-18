@@ -6,15 +6,11 @@ import { parseInpFile } from "./inp-parser";
 import multer from "multer";
 
 // Configure multer for file uploads (in-memory storage)
+// Use .any() to accept all files, then filter .inp files in the handler
 const upload = multer({ 
   storage: multer.memoryStorage(),
-  fileFilter: (req, file, cb) => {
-    // Silently skip non-.inp files (don't throw error, just don't accept them)
-    if (file.originalname.toLowerCase().endsWith('.inp')) {
-      cb(null, true);
-    } else {
-      cb(null, false); // Skip file without error
-    }
+  limits: {
+    fileSize: 50 * 1024 * 1024, // 50MB max file size
   }
 });
 
@@ -60,17 +56,23 @@ export async function registerRoutes(
     }
   });
 
-  // Upload .inp file(s)
-  app.post("/api/inp-files/upload", upload.array('files', 100), async (req, res) => {
+  // Upload .inp file(s) - accepts any files, filters for .inp in handler
+  app.post("/api/inp-files/upload", upload.any(), async (req, res) => {
     try {
-      const files = req.files as Express.Multer.File[];
-      if (!files || files.length === 0) {
-        return res.status(400).json({ error: 'No files uploaded' });
+      const allFiles = req.files as Express.Multer.File[];
+      
+      // Filter only .inp files
+      const inpFiles = allFiles.filter(f => 
+        f.originalname.toLowerCase().endsWith('.inp')
+      );
+      
+      if (!inpFiles || inpFiles.length === 0) {
+        return res.status(400).json({ error: 'No .inp files found in upload' });
       }
 
       const createdFiles = [];
 
-      for (const file of files) {
+      for (const file of inpFiles) {
         const content = file.buffer.toString('utf-8');
         const metadata = parseInpFile(content);
         
