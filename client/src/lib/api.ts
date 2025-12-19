@@ -10,6 +10,45 @@ export interface InpFile {
   description?: string;
 }
 
+export interface Coordinate {
+  x: number;
+  y: number;
+}
+
+export interface NodeCoordinate {
+  id: string;
+  x: number;
+  y: number;
+}
+
+export interface LinkVertices {
+  id: string;
+  vertices: Coordinate[];
+}
+
+export interface PolygonCoordinates {
+  id: string;
+  vertices: Coordinate[];
+}
+
+export interface LinkDefinition {
+  id: string;
+  fromNode: string;
+  toNode: string;
+}
+
+export interface CoordinateData {
+  nodes: NodeCoordinate[];
+  vertices: LinkVertices[];
+  polygons: PolygonCoordinates[];
+  links: LinkDefinition[];
+}
+
+export interface InpFileWithContent extends InpFile {
+  fileContent: string;
+  coordinates: CoordinateData | null;
+}
+
 export async function getAllInpFiles(): Promise<InpFile[]> {
   const response = await fetch('/api/inp-files');
   if (!response.ok) {
@@ -18,7 +57,7 @@ export async function getAllInpFiles(): Promise<InpFile[]> {
   return response.json();
 }
 
-export async function getInpFile(id: string): Promise<InpFile & { fileContent: string }> {
+export async function getInpFile(id: string): Promise<InpFileWithContent> {
   const response = await fetch(`/api/inp-files/${id}`);
   if (!response.ok) {
     throw new Error('Failed to fetch file');

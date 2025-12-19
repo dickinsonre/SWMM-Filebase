@@ -2,8 +2,8 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FileText, Activity, GitBranch, Database, MoreVertical, Folder, Map, Eye } from "lucide-react";
-import { InpFile } from "@/lib/api";
+import { FileText, Activity, GitBranch, Database, MoreVertical, Folder, Map, Eye, Loader2 } from "lucide-react";
+import { InpFile, CoordinateData } from "@/lib/api";
 import { useFiles } from "@/context/FileContext";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { getInpFile } from "@/lib/api";
+import { MapVisualization } from "./MapVisualization";
 
 interface FileCardProps {
   file: InpFile;
@@ -41,7 +42,9 @@ export function FileCard({ file }: FileCardProps) {
   const [showMap, setShowMap] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [fileContent, setFileContent] = useState("");
+  const [coordinates, setCoordinates] = useState<CoordinateData | null>(null);
   const [loading, setLoading] = useState(false);
+  const [mapLoading, setMapLoading] = useState(false);
 
   const handleViewContent = async () => {
     setLoading(true);
@@ -76,6 +79,23 @@ export function FileCard({ file }: FileCardProps) {
     }
   };
 
+  const handleShowMap = async () => {
+    setMapLoading(true);
+    try {
+      const fullFile = await getInpFile(file.id);
+      setCoordinates(fullFile.coordinates);
+      setShowMap(true);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to load map data",
+        variant: "destructive"
+      });
+    } finally {
+      setMapLoading(false);
+    }
+  };
+
   return (
     <>
       <Card className="group hover:border-primary/50 transition-all duration-300 hover:shadow-md border-border/60 bg-card/50 backdrop-blur-sm">
@@ -105,9 +125,9 @@ export function FileCard({ file }: FileCardProps) {
                 <Eye className="h-4 w-4 mr-2" />
                 {loading ? "Loading..." : "View Content"}
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setShowMap(true)} data-testid={`show-map-${file.id}`}>
+              <DropdownMenuItem onClick={handleShowMap} disabled={mapLoading} data-testid={`show-map-${file.id}`}>
                 <Map className="h-4 w-4 mr-2" />
-                Show Map
+                {mapLoading ? "Loading..." : "Show Map"}
               </DropdownMenuItem>
               <DropdownMenuItem className="text-destructive" onClick={() => setShowDeleteConfirm(true)} data-testid={`delete-file-${file.id}`}>
                 Delete
@@ -160,24 +180,30 @@ export function FileCard({ file }: FileCardProps) {
       </Dialog>
 
       <Dialog open={showMap} onOpenChange={setShowMap}>
-        <DialogContent className="max-w-4xl max-h-[80vh]">
+        <DialogContent className="max-w-5xl max-h-[85vh]">
           <DialogHeader>
             <DialogTitle className="font-mono flex items-center gap-2">
               <Map className="h-5 w-5" />
               Model Map: {file.filename}
             </DialogTitle>
           </DialogHeader>
-          <div className="h-[60vh] flex items-center justify-center bg-muted/30 rounded-lg border border-border">
-            <div className="text-center text-muted-foreground">
-              <Map className="h-16 w-16 mx-auto mb-4 opacity-50" />
-              <p className="text-lg font-medium">Map Visualization</p>
-              <p className="text-sm mt-2">
-                {file.nodeCount} nodes • {file.linkCount} links • {file.subcatchmentCount} subcatchments
-              </p>
-              <p className="text-xs mt-4 max-w-md mx-auto">
-                Map rendering requires parsing coordinate data from the [COORDINATES] and [VERTICES] sections of the .inp file.
-              </p>
-            </div>
+          <div className="h-[65vh]">
+            {coordinates && coordinates.nodes.length > 0 ? (
+              <MapVisualization coordinates={coordinates} width={900} height={500} />
+            ) : (
+              <div className="h-full flex items-center justify-center bg-muted/30 rounded-lg border border-border">
+                <div className="text-center text-muted-foreground">
+                  <Map className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                  <p className="text-lg font-medium">No Coordinate Data</p>
+                  <p className="text-sm mt-2">
+                    This file does not contain a [COORDINATES] section.
+                  </p>
+                  <p className="text-xs mt-4 max-w-md mx-auto">
+                    Add node coordinates to your .inp file to visualize the model layout.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>
