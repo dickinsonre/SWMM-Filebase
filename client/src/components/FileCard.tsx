@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FileText, Activity, GitBranch, Database, MoreVertical, Folder, Map, Eye, Loader2 } from "lucide-react";
+import { FileText, Activity, GitBranch, Database, MoreVertical, Folder, Map, Eye, Loader2, Copy, Check } from "lucide-react";
 import { InpFile, CoordinateData } from "@/lib/api";
 import { useFiles } from "@/context/FileContext";
 import { toast } from "@/hooks/use-toast";
@@ -45,6 +45,25 @@ export function FileCard({ file }: FileCardProps) {
   const [coordinates, setCoordinates] = useState<CoordinateData | null>(null);
   const [loading, setLoading] = useState(false);
   const [mapLoading, setMapLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyContent = async () => {
+    try {
+      await navigator.clipboard.writeText(fileContent);
+      setCopied(true);
+      toast({
+        title: "Copied",
+        description: "File content copied to clipboard",
+      });
+      setTimeout(() => setCopied(false), 2000);
+    } catch (error) {
+      toast({
+        title: "Copy failed",
+        description: "Failed to copy content to clipboard",
+        variant: "destructive"
+      });
+    }
+  };
 
   const handleViewContent = async () => {
     setLoading(true);
@@ -168,7 +187,19 @@ export function FileCard({ file }: FileCardProps) {
       <Dialog open={showContent} onOpenChange={setShowContent}>
         <DialogContent className="max-w-4xl max-h-[80vh]">
           <DialogHeader>
-            <DialogTitle className="font-mono">{file.filename}</DialogTitle>
+            <div className="flex items-center justify-between">
+              <DialogTitle className="font-mono">{file.filename}</DialogTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCopyContent}
+                className="gap-2"
+                data-testid="copy-content-button"
+              >
+                {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                {copied ? "Copied" : "Copy"}
+              </Button>
+            </div>
           </DialogHeader>
           <Textarea 
             value={fileContent} 
