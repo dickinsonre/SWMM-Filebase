@@ -88,7 +88,14 @@ export async function getInpFile(id: string): Promise<InpFileWithContent> {
   return response.json();
 }
 
-export async function uploadInpFiles(files: File[], directory?: string): Promise<{ files: InpFile[], count: number }> {
+export interface UploadResult {
+  files: InpFile[];
+  count: number;
+  failed: { filename: string; error: string }[];
+  failedCount: number;
+}
+
+export async function uploadInpFiles(files: File[], directory?: string): Promise<UploadResult> {
   const formData = new FormData();
   
   for (const file of files) {

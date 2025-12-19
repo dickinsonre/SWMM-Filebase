@@ -58,7 +58,6 @@ export function Sidebar() {
     setUploading(true);
     setUploadProgress({ current: 0, total: inpFiles.length });
     try {
-      // For directory imports, extract directory path from first file
       let directory = "Imported Files";
       if (source === 'directory' && inpFiles[0].webkitRelativePath) {
         const pathParts = inpFiles[0].webkitRelativePath.split('/');
@@ -67,13 +66,21 @@ export function Sidebar() {
         }
       }
 
-      await uploadFiles(inpFiles, directory);
+      const result = await uploadFiles(inpFiles, directory);
       setUploadProgress({ current: inpFiles.length, total: inpFiles.length });
       
-      toast({
-        title: "Import Successful",
-        description: `Uploaded ${inpFiles.length} file${inpFiles.length > 1 ? 's' : ''}`,
-      });
+      if (result.failedCount > 0) {
+        toast({
+          title: `Imported ${result.count} file${result.count !== 1 ? 's' : ''}`,
+          description: `${result.failedCount} file${result.failedCount !== 1 ? 's' : ''} failed: ${result.failed.map(f => f.filename).join(', ')}`,
+          variant: result.count > 0 ? "default" : "destructive"
+        });
+      } else {
+        toast({
+          title: "Import Successful",
+          description: `Uploaded ${result.count} file${result.count !== 1 ? 's' : ''}`,
+        });
+      }
     } catch (error) {
       toast({
         title: "Upload Failed",

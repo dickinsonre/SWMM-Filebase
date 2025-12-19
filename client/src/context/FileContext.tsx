@@ -1,12 +1,12 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import { InpFile } from '@/lib/api';
+import { InpFile, UploadResult } from '@/lib/api';
 import * as api from '@/lib/api';
 
 interface FileContextType {
   files: InpFile[];
   loading: boolean;
   error: string | null;
-  uploadFiles: (files: File[], directory?: string) => Promise<void>;
+  uploadFiles: (files: File[], directory?: string) => Promise<UploadResult>;
   removeFile: (id: string) => Promise<void>;
   removeDirectory: (directory: string) => Promise<void>;
   refreshFiles: () => Promise<void>;
@@ -33,12 +33,12 @@ export function FileProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const uploadFiles = async (filesToUpload: File[], directory?: string) => {
+  const uploadFiles = async (filesToUpload: File[], directory?: string): Promise<UploadResult> => {
     try {
       setError(null);
-      await api.uploadInpFiles(filesToUpload, directory);
-      // Refresh the file list after upload
+      const result = await api.uploadInpFiles(filesToUpload, directory);
       await refreshFiles();
+      return result;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to upload files');
       throw err;

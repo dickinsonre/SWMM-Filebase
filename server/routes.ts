@@ -142,40 +142,54 @@ export async function registerRoutes(
       }
 
       const createdFiles = [];
+      const failedFiles: { filename: string; error: string }[] = [];
 
       for (const file of inpFiles) {
-        const content = file.buffer.toString('utf-8');
-        const metadata = parseInpFile(content);
-        const directory = req.body.directory || 'Imported Files';
+        try {
+          const content = file.buffer.toString('utf-8');
+          const metadata = parseInpFile(content);
+          const directory = req.body.directory || 'Imported Files';
 
-        const objectPath = await objectStorageService.uploadInpFile(content, file.originalname);
+          const objectPath = await objectStorageService.uploadInpFile(content, file.originalname);
 
-        const newFile = await storage.createInpFile({
-          filename: file.originalname,
-          directory,
-          size: file.size,
-          lastModified: new Date(),
-          nodeCount: metadata.nodeCount,
-          linkCount: metadata.linkCount,
-          subcatchmentCount: metadata.subcatchmentCount,
-          description: 'Uploaded via web interface',
-          objectPath
-        });
+          const newFile = await storage.createInpFile({
+            filename: file.originalname,
+            directory,
+            size: file.size,
+            lastModified: new Date(),
+            nodeCount: metadata.nodeCount,
+            linkCount: metadata.linkCount,
+            subcatchmentCount: metadata.subcatchmentCount,
+            description: 'Uploaded via web interface',
+            objectPath
+          });
 
-        createdFiles.push({
-          id: newFile.id,
-          filename: newFile.filename,
-          directory: newFile.directory,
-          size: formatFileSize(newFile.size),
-          lastModified: newFile.lastModified.toISOString().split('T')[0],
-          nodeCount: newFile.nodeCount,
-          linkCount: newFile.linkCount,
-          subcatchmentCount: newFile.subcatchmentCount,
-          description: newFile.description
-        });
+          createdFiles.push({
+            id: newFile.id,
+            filename: newFile.filename,
+            directory: newFile.directory,
+            size: formatFileSize(newFile.size),
+            lastModified: newFile.lastModified.toISOString().split('T')[0],
+            nodeCount: newFile.nodeCount,
+            linkCount: newFile.linkCount,
+            subcatchmentCount: newFile.subcatchmentCount,
+            description: newFile.description
+          });
+        } catch (fileError) {
+          console.error(`Error uploading file ${file.originalname}:`, fileError);
+          failedFiles.push({
+            filename: file.originalname,
+            error: fileError instanceof Error ? fileError.message : 'Unknown error'
+          });
+        }
       }
 
-      res.json({ files: createdFiles, count: createdFiles.length });
+      res.json({ 
+        files: createdFiles, 
+        count: createdFiles.length,
+        failed: failedFiles,
+        failedCount: failedFiles.length
+      });
     } catch (error) {
       console.error('Error uploading files:', error);
       res.status(500).json({ error: 'Failed to upload files' });
