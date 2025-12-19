@@ -69,6 +69,57 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/inp-files/compare", async (req, res) => {
+    try {
+      const { file1, file2 } = req.query;
+      
+      if (!file1 || !file2) {
+        return res.status(400).json({ error: 'Both file1 and file2 query parameters are required' });
+      }
+      
+      const [fileData1, fileData2] = await Promise.all([
+        storage.getInpFile(file1 as string),
+        storage.getInpFile(file2 as string)
+      ]);
+      
+      if (!fileData1) {
+        return res.status(404).json({ error: `File with id ${file1} not found` });
+      }
+      if (!fileData2) {
+        return res.status(404).json({ error: `File with id ${file2} not found` });
+      }
+      
+      const [content1, content2] = await Promise.all([
+        objectStorageService.getInpFileContent(fileData1.objectPath).catch(() => ''),
+        objectStorageService.getInpFileContent(fileData2.objectPath).catch(() => '')
+      ]);
+      
+      res.json({
+        file1: {
+          id: fileData1.id,
+          filename: fileData1.filename,
+          directory: fileData1.directory,
+          nodeCount: fileData1.nodeCount,
+          linkCount: fileData1.linkCount,
+          subcatchmentCount: fileData1.subcatchmentCount,
+          content: content1
+        },
+        file2: {
+          id: fileData2.id,
+          filename: fileData2.filename,
+          directory: fileData2.directory,
+          nodeCount: fileData2.nodeCount,
+          linkCount: fileData2.linkCount,
+          subcatchmentCount: fileData2.subcatchmentCount,
+          content: content2
+        }
+      });
+    } catch (error) {
+      console.error('Error comparing files:', error);
+      res.status(500).json({ error: 'Failed to compare files' });
+    }
+  });
+
   app.post("/api/inp-files/upload", upload.any(), async (req, res) => {
     try {
       const allFiles = req.files as Express.Multer.File[];
