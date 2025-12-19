@@ -2,14 +2,15 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FileText, Activity, GitBranch, Database, MoreVertical, Folder, Map, Eye, Loader2, Copy, Check } from "lucide-react";
-import { InpFile, CoordinateData } from "@/lib/api";
+import { FileText, Activity, GitBranch, Database, MoreVertical, Folder, Map, Eye, Loader2, Copy, Check, Pin, Download } from "lucide-react";
+import { InpFile, CoordinateData, togglePinFile, exportFiles, recordFileAccess } from "@/lib/api";
 import { useFiles } from "@/context/FileContext";
 import { toast } from "@/hooks/use-toast";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -34,9 +35,10 @@ import { MapVisualization } from "./MapVisualization";
 
 interface FileCardProps {
   file: InpFile;
+  onPinChange?: () => void;
 }
 
-export function FileCard({ file }: FileCardProps) {
+export function FileCard({ file, onPinChange }: FileCardProps) {
   const { removeFile } = useFiles();
   const [showContent, setShowContent] = useState(false);
   const [showMap, setShowMap] = useState(false);
@@ -46,6 +48,9 @@ export function FileCard({ file }: FileCardProps) {
   const [loading, setLoading] = useState(false);
   const [mapLoading, setMapLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [isPinned, setIsPinned] = useState(false);
+  const [pinLoading, setPinLoading] = useState(false);
+  const [exportLoading, setExportLoading] = useState(false);
 
   const handleCopyContent = async () => {
     try {
@@ -71,6 +76,7 @@ export function FileCard({ file }: FileCardProps) {
       const fullFile = await getInpFile(file.id);
       setFileContent(fullFile.fileContent || "No content available");
       setShowContent(true);
+      await recordFileAccess(file.id);
     } catch (error) {
       toast({
         title: "Error",
@@ -104,6 +110,7 @@ export function FileCard({ file }: FileCardProps) {
       const fullFile = await getInpFile(file.id);
       setCoordinates(fullFile.coordinates);
       setShowMap(true);
+      await recordFileAccess(file.id);
     } catch (error) {
       toast({
         title: "Error",
@@ -112,6 +119,46 @@ export function FileCard({ file }: FileCardProps) {
       });
     } finally {
       setMapLoading(false);
+    }
+  };
+
+  const handleTogglePin = async () => {
+    setPinLoading(true);
+    try {
+      const result = await togglePinFile(file.id);
+      setIsPinned(result.isPinned);
+      toast({
+        title: result.isPinned ? "File pinned" : "File unpinned",
+        description: result.isPinned ? `${file.filename} added to quick access` : `${file.filename} removed from quick access`,
+      });
+      onPinChange?.();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to toggle pin",
+        variant: "destructive"
+      });
+    } finally {
+      setPinLoading(false);
+    }
+  };
+
+  const handleExport = async () => {
+    setExportLoading(true);
+    try {
+      await exportFiles([file.id]);
+      toast({
+        title: "Export complete",
+        description: `Downloaded ${file.filename} as ZIP`,
+      });
+    } catch (error) {
+      toast({
+        title: "Export failed",
+        description: "Failed to export file",
+        variant: "destructive"
+      });
+    } finally {
+      setExportLoading(false);
     }
   };
 
@@ -148,6 +195,16 @@ export function FileCard({ file }: FileCardProps) {
                 <Map className="h-4 w-4 mr-2" />
                 {mapLoading ? "Loading..." : "Show Map"}
               </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleTogglePin} disabled={pinLoading} data-testid={`pin-file-${file.id}`}>
+                <Pin className="h-4 w-4 mr-2" />
+                {pinLoading ? "..." : isPinned ? "Unpin" : "Pin to Quick Access"}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExport} disabled={exportLoading} data-testid={`export-file-${file.id}`}>
+                <Download className="h-4 w-4 mr-2" />
+                {exportLoading ? "Exporting..." : "Export as ZIP"}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem className="text-destructive" onClick={() => setShowDeleteConfirm(true)} data-testid={`delete-file-${file.id}`}>
                 Delete
               </DropdownMenuItem>

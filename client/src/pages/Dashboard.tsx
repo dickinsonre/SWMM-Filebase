@@ -1,19 +1,91 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { FileCard } from "@/components/FileCard";
 import { useFiles } from "@/context/FileContext";
-import { InpFile } from "@/lib/api";
+import { InpFile, QuickAccessFile, ContentSearchResult, searchFileContent, getPinnedFiles, getRecentFiles, exportDirectory } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Filter, SortAsc, Plus, Loader2 } from "lucide-react";
-import { motion } from "framer-motion";
+import { Search, Filter, SortAsc, Plus, Loader2, Pin, Clock, FileSearch, Download, X } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Link } from "wouter";
+import { toast } from "@/hooks/use-toast";
 import heroBg from "@assets/generated_images/technical_hydrology_network_blueprint_abstract_background.png";
 
 export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [contentSearchQuery, setContentSearchQuery] = useState("");
+  const [contentSearchResults, setContentSearchResults] = useState<ContentSearchResult[]>([]);
+  const [isSearchingContent, setIsSearchingContent] = useState(false);
+  const [pinnedFiles, setPinnedFiles] = useState<QuickAccessFile[]>([]);
+  const [recentFiles, setRecentFiles] = useState<QuickAccessFile[]>([]);
+  const [exportingDir, setExportingDir] = useState<string | null>(null);
   const { files, loading, error } = useFiles();
 
-  // Group files by directory
+  useEffect(() => {
+    loadQuickAccess();
+  }, []);
+
+  const loadQuickAccess = async () => {
+    try {
+      const [pinned, recent] = await Promise.all([
+        getPinnedFiles(),
+        getRecentFiles(5)
+      ]);
+      setPinnedFiles(pinned);
+      setRecentFiles(recent);
+    } catch (err) {
+      console.error("Failed to load quick access files:", err);
+    }
+  };
+
+  const handleContentSearch = async () => {
+    if (!contentSearchQuery.trim()) return;
+    
+    setIsSearchingContent(true);
+    try {
+      const results = await searchFileContent(contentSearchQuery);
+      setContentSearchResults(results);
+      if (results.length === 0) {
+        toast({
+          title: "No results",
+          description: `No files contain "${contentSearchQuery}"`,
+        });
+      }
+    } catch (err) {
+      toast({
+        title: "Search failed",
+        description: "Failed to search file content",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSearchingContent(false);
+    }
+  };
+
+  const clearContentSearch = () => {
+    setContentSearchQuery("");
+    setContentSearchResults([]);
+  };
+
+  const handleExportDirectory = async (directory: string) => {
+    setExportingDir(directory);
+    try {
+      await exportDirectory(directory);
+      toast({
+        title: "Export complete",
+        description: `Downloaded ${directory} as ZIP`,
+      });
+    } catch (err) {
+      toast({
+        title: "Export failed",
+        description: "Failed to export directory",
+        variant: "destructive"
+      });
+    } finally {
+      setExportingDir(null);
+    }
+  };
+
   const groupedFiles = files.reduce((acc, file) => {
     if (!acc[file.directory]) {
       acc[file.directory] = [];
@@ -77,14 +149,58 @@ export default function Dashboard() {
             </div>
           </div>
 
+          {/* Quick Access Section */}
+          {(pinnedFiles.length > 0 || recentFiles.length > 0) && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {pinnedFiles.length > 0 && (
+                <div className="bg-card/50 border border-border/40 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Pin className="h-4 w-4 text-primary" />
+                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Pinned Files</h3>
+                  </div>
+                  <div className="space-y-2">
+                    {pinnedFiles.map(file => (
+                      <Link key={file.id} href={`/file/${file.id}`}>
+                        <div className="flex items-center gap-2 p-2 rounded hover:bg-muted/50 cursor-pointer transition-colors" data-testid={`pinned-file-${file.id}`}>
+                          <span className="text-sm font-mono truncate">{file.filename}</span>
+                          <span className="text-xs text-muted-foreground truncate">({file.directory})</span>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {recentFiles.length > 0 && (
+                <div className="bg-card/50 border border-border/40 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Clock className="h-4 w-4 text-primary" />
+                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Recent Files</h3>
+                  </div>
+                  <div className="space-y-2">
+                    {recentFiles.map(file => (
+                      <Link key={file.id} href={`/file/${file.id}`}>
+                        <div className="flex items-center gap-2 p-2 rounded hover:bg-muted/50 cursor-pointer transition-colors" data-testid={`recent-file-${file.id}`}>
+                          <span className="text-sm font-mono truncate">{file.filename}</span>
+                          <span className="text-xs text-muted-foreground truncate">({file.directory})</span>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Search Bar */}
           <div className="flex items-center gap-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input 
-                placeholder="Search files, nodes, or descriptions..." 
+                placeholder="Search files and directories..." 
                 className="pl-9 h-10 bg-card border-border/60 shadow-sm"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                data-testid="search-input"
               />
             </div>
             <Button variant="outline" className="gap-2 text-muted-foreground border-border/60 shadow-sm">
@@ -96,6 +212,76 @@ export default function Dashboard() {
             <Button className="gap-2 shadow-md">
               <Plus className="h-4 w-4" /> New Model
             </Button>
+          </div>
+
+          {/* Content Search */}
+          <div className="bg-card/50 border border-border/40 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <FileSearch className="h-4 w-4 text-primary" />
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Search File Content</h3>
+            </div>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Input
+                  placeholder="Search within .inp file content (e.g., OUTFALL, CONDUIT names)..."
+                  value={contentSearchQuery}
+                  onChange={(e) => setContentSearchQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleContentSearch()}
+                  className="pr-8"
+                  data-testid="content-search-input"
+                />
+                {contentSearchQuery && (
+                  <button
+                    onClick={clearContentSearch}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+              <Button onClick={handleContentSearch} disabled={isSearchingContent || !contentSearchQuery.trim()} data-testid="content-search-button">
+                {isSearchingContent ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                Search Content
+              </Button>
+            </div>
+
+            {/* Content Search Results */}
+            <AnimatePresence>
+              {contentSearchResults.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="mt-4 space-y-3"
+                  data-testid="content-search-results"
+                >
+                  <div className="text-sm text-muted-foreground" data-testid="content-search-count">
+                    Found {contentSearchResults.length} file(s) containing "{contentSearchQuery}"
+                  </div>
+                  {contentSearchResults.map(result => (
+                    <div key={result.id} className="bg-muted/30 rounded-lg p-3 border border-border/40" data-testid={`search-result-${result.id}`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-mono text-sm font-medium">{result.filename}</span>
+                        <span className="text-xs text-muted-foreground">{result.directory}</span>
+                      </div>
+                      <div className="space-y-1 max-h-32 overflow-y-auto">
+                        {result.matches.slice(0, 5).map((match, idx) => (
+                          <div key={idx} className="text-xs font-mono bg-background/50 p-1.5 rounded flex gap-2" data-testid={`match-line-${result.id}-${idx}`}>
+                            <span className="text-muted-foreground shrink-0">L{match.lineNumber}:</span>
+                            <span className="truncate">{match.content}</span>
+                          </div>
+                        ))}
+                        {result.matches.length > 5 && (
+                          <div className="text-xs text-muted-foreground">
+                            +{result.matches.length - 5} more matches
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
 
@@ -121,13 +307,28 @@ export default function Dashboard() {
                   {directory}
                 </h2>
                 <div className="h-px flex-1 bg-border/60" />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleExportDirectory(directory)}
+                  disabled={exportingDir === directory}
+                  className="text-muted-foreground hover:text-foreground"
+                  data-testid={`export-dir-${directory}`}
+                >
+                  {exportingDir === directory ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4" />
+                  )}
+                  <span className="ml-1 text-xs">Export</span>
+                </Button>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {groupedFiles[directory]
                   .filter(f => f.filename.toLowerCase().includes(searchQuery.toLowerCase()) || searchQuery === "")
                   .map((file) => (
-                  <FileCard key={file.id} file={file} />
+                  <FileCard key={file.id} file={file} onPinChange={loadQuickAccess} />
                 ))}
               </div>
             </motion.div>

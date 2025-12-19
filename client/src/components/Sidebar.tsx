@@ -1,12 +1,13 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, BrainCircuit, Settings, FolderOpen, UploadCloud, Search, FolderInput, ChevronDown, ChevronRight, Trash2, GitCompare } from "lucide-react";
+import { LayoutDashboard, BrainCircuit, Settings, FolderOpen, UploadCloud, Search, FolderInput, ChevronDown, ChevronRight, Trash2, GitCompare, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { useFiles } from "@/context/FileContext";
 import { useRef, useState } from "react";
 import { toast } from "@/hooks/use-toast";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,6 +26,7 @@ export function Sidebar() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dirInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
   const [directoriesCollapsed, setDirectoriesCollapsed] = useState(false);
 
   const navItems = [
@@ -54,6 +56,7 @@ export function Sidebar() {
     }
 
     setUploading(true);
+    setUploadProgress({ current: 0, total: inpFiles.length });
     try {
       // For directory imports, extract directory path from first file
       let directory = "Imported Files";
@@ -65,11 +68,11 @@ export function Sidebar() {
       }
 
       await uploadFiles(inpFiles, directory);
+      setUploadProgress({ current: inpFiles.length, total: inpFiles.length });
       
-      const fileNames = inpFiles.map(f => f.name).join(', ');
       toast({
         title: "Import Successful",
-        description: `Uploaded: ${fileNames}`,
+        description: `Uploaded ${inpFiles.length} file${inpFiles.length > 1 ? 's' : ''}`,
       });
     } catch (error) {
       toast({
@@ -108,23 +111,73 @@ export function Sidebar() {
       </div>
 
       <div className="p-4">
-        <div className="grid grid-cols-2 gap-2 mb-6">
-          <Button 
-            className="w-full bg-primary text-primary-foreground hover:bg-primary/90 shadow-md text-xs gap-2 px-2"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-          >
-            <UploadCloud className="h-3.5 w-3.5" />
-            {uploading ? 'Uploading...' : 'File'}
-          </Button>
-          <Button 
-            className="w-full bg-sidebar-accent text-sidebar-accent-foreground hover:bg-sidebar-accent/80 shadow-sm border border-sidebar-border text-xs gap-2 px-2"
-            onClick={() => dirInputRef.current?.click()}
-            disabled={uploading}
-          >
-            <FolderInput className="h-3.5 w-3.5" />
-            {uploading ? 'Uploading...' : 'Folder'}
-          </Button>
+        <div className="space-y-2 mb-6">
+          <div className="grid grid-cols-2 gap-2">
+            <Button 
+              className="w-full bg-primary text-primary-foreground hover:bg-primary/90 shadow-md text-xs gap-2 px-2"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              data-testid="upload-file-button"
+            >
+              {uploading ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <UploadCloud className="h-3.5 w-3.5" />
+              )}
+              File
+            </Button>
+            <Button 
+              className="w-full bg-sidebar-accent text-sidebar-accent-foreground hover:bg-sidebar-accent/80 shadow-sm border border-sidebar-border text-xs gap-2 px-2"
+              onClick={() => dirInputRef.current?.click()}
+              disabled={uploading}
+              data-testid="upload-folder-button"
+            >
+              {uploading ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <FolderInput className="h-3.5 w-3.5" />
+              )}
+              Folder
+            </Button>
+          </div>
+          
+          <AnimatePresence>
+            {uploading && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden"
+                data-testid="upload-progress-container"
+              >
+                <div className="bg-sidebar-accent/30 rounded-lg p-3 border border-sidebar-border/50">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                    <span className="text-xs font-medium" data-testid="upload-status-text">
+                      Uploading {uploadProgress.total} file{uploadProgress.total !== 1 ? 's' : ''}...
+                    </span>
+                  </div>
+                  <div className="h-1.5 bg-sidebar-border/50 rounded-full overflow-hidden">
+                    <motion.div
+                      className="h-full bg-primary rounded-full"
+                      initial={{ x: "-100%" }}
+                      animate={{ x: "100%" }}
+                      transition={{ 
+                        duration: 1.5, 
+                        repeat: Infinity, 
+                        ease: "linear"
+                      }}
+                      style={{ width: "50%" }}
+                      data-testid="upload-progress-bar"
+                    />
+                  </div>
+                  <p className="text-[10px] text-sidebar-foreground/50 mt-1">
+                    Processing and analyzing file content...
+                  </p>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Hidden Inputs */}
