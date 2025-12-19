@@ -305,7 +305,6 @@ export function Sidebar() {
           webkitdirectory="" 
           directory=""
           multiple 
-          accept=".inp"
           onChange={handleDirectoryImport}
         />
 
