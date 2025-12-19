@@ -1,9 +1,10 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, BrainCircuit, Settings, FolderOpen, UploadCloud, Search, FolderInput, ChevronDown, ChevronRight, Trash2, GitCompare, Loader2 } from "lucide-react";
+import { LayoutDashboard, BrainCircuit, Settings, FolderOpen, UploadCloud, Search, FolderInput, ChevronDown, ChevronRight, Trash2, GitCompare, Loader2, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useFiles } from "@/context/FileContext";
 import { useRef, useState } from "react";
 import { toast } from "@/hooks/use-toast";
@@ -19,6 +20,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export function Sidebar() {
   const [location] = useLocation();
@@ -28,6 +37,10 @@ export function Sidebar() {
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
   const [directoriesCollapsed, setDirectoriesCollapsed] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
+  const [showFileSelector, setShowFileSelector] = useState(false);
+  const [pendingDirectory, setPendingDirectory] = useState("Imported Files");
 
   const navItems = [
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -94,9 +107,95 @@ export function Sidebar() {
 
   const handleDirectoryImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      handleFileUpload(e.target.files, 'directory');
+      const inpFiles = Array.from(e.target.files).filter(f => f.name.toLowerCase().endsWith('.inp'));
+      
+      if (inpFiles.length === 0) {
+        toast({
+          title: "No .inp files found",
+          description: "The selected folder contains no SWMM5 .inp files.",
+          variant: "destructive"
+        });
+        e.target.value = '';
+        return;
+      }
+      
+      let directory = "Imported Files";
+      if (inpFiles[0].webkitRelativePath) {
+        const pathParts = inpFiles[0].webkitRelativePath.split('/');
+        if (pathParts.length > 1) {
+          directory = pathParts[0];
+        }
+      }
+      
+      setPendingFiles(inpFiles);
+      setPendingDirectory(directory);
+      setSelectedFiles(new Set(inpFiles.map(f => f.name)));
+      setShowFileSelector(true);
     }
     e.target.value = '';
+  };
+
+  const handleConfirmImport = async () => {
+    const filesToUpload = pendingFiles.filter(f => selectedFiles.has(f.name));
+    
+    if (filesToUpload.length === 0) {
+      toast({
+        title: "No files selected",
+        description: "Please select at least one file to import.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setShowFileSelector(false);
+    setUploading(true);
+    setUploadProgress({ current: 0, total: filesToUpload.length });
+    
+    try {
+      const result = await uploadFiles(filesToUpload, pendingDirectory);
+      setUploadProgress({ current: filesToUpload.length, total: filesToUpload.length });
+      
+      if (result.failedCount > 0) {
+        toast({
+          title: `Imported ${result.count} file${result.count !== 1 ? 's' : ''}`,
+          description: `${result.failedCount} file${result.failedCount !== 1 ? 's' : ''} failed`,
+          variant: result.count > 0 ? "default" : "destructive"
+        });
+      } else {
+        toast({
+          title: "Import Successful",
+          description: `Uploaded ${result.count} file${result.count !== 1 ? 's' : ''}`,
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Upload Failed",
+        description: error instanceof Error ? error.message : "Failed to upload files",
+        variant: "destructive"
+      });
+    } finally {
+      setUploading(false);
+      setPendingFiles([]);
+      setSelectedFiles(new Set());
+    }
+  };
+
+  const toggleFileSelection = (filename: string) => {
+    const newSelection = new Set(selectedFiles);
+    if (newSelection.has(filename)) {
+      newSelection.delete(filename);
+    } else {
+      newSelection.add(filename);
+    }
+    setSelectedFiles(newSelection);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedFiles.size === pendingFiles.length) {
+      setSelectedFiles(new Set());
+    } else {
+      setSelectedFiles(new Set(pendingFiles.map(f => f.name)));
+    }
   };
 
   const handleFileImport = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -347,6 +446,58 @@ export function Sidebar() {
           </div>
         </div>
       </div>
+
+      <Dialog open={showFileSelector} onOpenChange={setShowFileSelector}>
+        <DialogContent className="max-w-lg max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Select Files to Import</DialogTitle>
+            <DialogDescription>
+              Found {pendingFiles.length} .inp files in "{pendingDirectory}". Select which files to import.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="flex items-center gap-2 py-2 border-b">
+            <Checkbox 
+              id="select-all"
+              checked={selectedFiles.size === pendingFiles.length}
+              onCheckedChange={toggleSelectAll}
+            />
+            <label htmlFor="select-all" className="text-sm font-medium cursor-pointer">
+              Select All ({selectedFiles.size}/{pendingFiles.length})
+            </label>
+          </div>
+          
+          <ScrollArea className="flex-1 max-h-[300px] pr-4">
+            <div className="space-y-1">
+              {pendingFiles.map((file, idx) => (
+                <div 
+                  key={idx} 
+                  className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-muted/50 cursor-pointer"
+                  onClick={() => toggleFileSelection(file.name)}
+                >
+                  <Checkbox 
+                    checked={selectedFiles.has(file.name)}
+                    onCheckedChange={() => toggleFileSelection(file.name)}
+                  />
+                  <span className="text-sm truncate flex-1">{file.name}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {(file.size / 1024).toFixed(1)} KB
+                  </span>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+          
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setShowFileSelector(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleConfirmImport} disabled={selectedFiles.size === 0}>
+              Import {selectedFiles.size} File{selectedFiles.size !== 1 ? 's' : ''}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
