@@ -20,7 +20,7 @@ Preferred communication style: Simple, everyday language.
 - **Build Tool**: Vite
 
 The frontend follows a component-based architecture with:
-- Pages in `client/src/pages/` (Dashboard, AIAnalysis, NotFound)
+- Pages in `client/src/pages/` (Dashboard, CompareModels, AIAnalysis, Settings, NotFound)
 - Reusable components in `client/src/components/`
 - Context providers for global state in `client/src/context/`
 - API client functions in `client/src/lib/api.ts`
@@ -34,6 +34,7 @@ The frontend follows a component-based architecture with:
 Key API endpoints:
 - `GET /api/inp-files` - List all uploaded files
 - `GET /api/inp-files/:id` - Get single file with content
+- `GET /api/inp-files/compare?file1=id&file2=id` - Compare two files (returns both contents)
 - `POST /api/inp-files/upload` - Upload new `.inp` files
 - `DELETE /api/inp-files/:id` - Remove a file
 
