@@ -1,9 +1,10 @@
-import type { Express } from "express";
+import type { Express, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { parseInpFile, parseCoordinates } from "./inp-parser";
 import { ObjectStorageService } from "./objectStorage";
 import multer from "multer";
+import archiver from "archiver";
 
 const upload = multer({ 
   storage: multer.memoryStorage(),
@@ -203,6 +204,149 @@ export async function registerRoutes(
     } catch (error) {
       console.error('Error deleting directory:', error);
       res.status(500).json({ error: 'Failed to delete directory' });
+    }
+  });
+
+  app.get("/api/inp-files/search/content", async (req, res) => {
+    try {
+      const { q } = req.query;
+      if (!q || typeof q !== 'string') {
+        return res.status(400).json({ error: 'Search query is required' });
+      }
+      
+      const allFiles = await storage.getAllInpFiles();
+      const results = [];
+      
+      for (const file of allFiles) {
+        try {
+          const content = await objectStorageService.getInpFileContent(file.objectPath);
+          if (content.toLowerCase().includes(q.toLowerCase())) {
+            const lines = content.split('\n');
+            const matches: { lineNumber: number; content: string }[] = [];
+            
+            for (let i = 0; i < lines.length; i++) {
+              if (lines[i].toLowerCase().includes(q.toLowerCase())) {
+                matches.push({ lineNumber: i + 1, content: lines[i].trim() });
+                if (matches.length >= 5) break;
+              }
+            }
+            
+            results.push({
+              id: file.id,
+              filename: file.filename,
+              directory: file.directory,
+              matches
+            });
+          }
+        } catch (err) {
+          console.error(`Error searching file ${file.filename}:`, err);
+        }
+      }
+      
+      res.json(results);
+    } catch (error) {
+      console.error('Error searching files:', error);
+      res.status(500).json({ error: 'Failed to search files' });
+    }
+  });
+
+  app.post("/api/inp-files/:id/pin", async (req, res) => {
+    try {
+      const file = await storage.togglePinFile(req.params.id);
+      if (!file) {
+        return res.status(404).json({ error: 'File not found' });
+      }
+      res.json({ id: file.id, isPinned: file.isPinned });
+    } catch (error) {
+      console.error('Error toggling pin:', error);
+      res.status(500).json({ error: 'Failed to toggle pin' });
+    }
+  });
+
+  app.get("/api/pinned-files", async (req, res) => {
+    try {
+      const files = await storage.getPinnedFiles();
+      res.json(files.map(f => ({
+        id: f.id,
+        filename: f.filename,
+        directory: f.directory,
+        isPinned: f.isPinned,
+        lastAccessedAt: f.lastAccessedAt?.toISOString()
+      })));
+    } catch (error) {
+      console.error('Error fetching pinned files:', error);
+      res.status(500).json({ error: 'Failed to fetch pinned files' });
+    }
+  });
+
+  app.get("/api/recent-files", async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 5;
+      const files = await storage.getRecentFiles(limit);
+      res.json(files.filter(f => f.lastAccessedAt).map(f => ({
+        id: f.id,
+        filename: f.filename,
+        directory: f.directory,
+        isPinned: f.isPinned,
+        lastAccessedAt: f.lastAccessedAt?.toISOString()
+      })));
+    } catch (error) {
+      console.error('Error fetching recent files:', error);
+      res.status(500).json({ error: 'Failed to fetch recent files' });
+    }
+  });
+
+  app.post("/api/inp-files/:id/access", async (req, res) => {
+    try {
+      await storage.updateLastAccessed(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error updating access time:', error);
+      res.status(500).json({ error: 'Failed to update access time' });
+    }
+  });
+
+  app.post("/api/export", async (req, res) => {
+    try {
+      const { fileIds, directory } = req.body;
+      
+      let filesToExport: { id: string; filename: string; objectPath: string }[] = [];
+      
+      if (directory) {
+        const dirFiles = await storage.getInpFilesByDirectory(directory);
+        filesToExport = dirFiles.map(f => ({ id: f.id, filename: f.filename, objectPath: f.objectPath }));
+      } else if (fileIds && Array.isArray(fileIds)) {
+        for (const id of fileIds) {
+          const file = await storage.getInpFile(id);
+          if (file) {
+            filesToExport.push({ id: file.id, filename: file.filename, objectPath: file.objectPath });
+          }
+        }
+      }
+      
+      if (filesToExport.length === 0) {
+        return res.status(400).json({ error: 'No files to export' });
+      }
+      
+      res.setHeader('Content-Type', 'application/zip');
+      res.setHeader('Content-Disposition', `attachment; filename="swmm5-export-${Date.now()}.zip"`);
+      
+      const archive = archiver('zip', { zlib: { level: 9 } });
+      archive.pipe(res);
+      
+      for (const file of filesToExport) {
+        try {
+          const content = await objectStorageService.getInpFileContent(file.objectPath);
+          archive.append(content, { name: file.filename });
+        } catch (err) {
+          console.error(`Error adding file to archive: ${file.filename}`, err);
+        }
+      }
+      
+      await archive.finalize();
+    } catch (error) {
+      console.error('Error exporting files:', error);
+      res.status(500).json({ error: 'Failed to export files' });
     }
   });
 

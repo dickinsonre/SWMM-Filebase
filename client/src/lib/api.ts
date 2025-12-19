@@ -108,3 +108,98 @@ export async function deleteDirectory(directory: string): Promise<void> {
     throw new Error('Failed to delete directory');
   }
 }
+
+export interface ContentSearchResult {
+  id: string;
+  filename: string;
+  directory: string;
+  matches: { lineNumber: number; content: string }[];
+}
+
+export interface QuickAccessFile {
+  id: string;
+  filename: string;
+  directory: string;
+  isPinned: boolean;
+  lastAccessedAt?: string;
+}
+
+export async function searchFileContent(query: string): Promise<ContentSearchResult[]> {
+  const response = await fetch(`/api/inp-files/search/content?q=${encodeURIComponent(query)}`);
+  if (!response.ok) {
+    throw new Error('Failed to search files');
+  }
+  return response.json();
+}
+
+export async function togglePinFile(id: string): Promise<{ id: string; isPinned: boolean }> {
+  const response = await fetch(`/api/inp-files/${id}/pin`, { method: 'POST' });
+  if (!response.ok) {
+    throw new Error('Failed to toggle pin');
+  }
+  return response.json();
+}
+
+export async function getPinnedFiles(): Promise<QuickAccessFile[]> {
+  const response = await fetch('/api/pinned-files');
+  if (!response.ok) {
+    throw new Error('Failed to fetch pinned files');
+  }
+  return response.json();
+}
+
+export async function getRecentFiles(limit = 5): Promise<QuickAccessFile[]> {
+  const response = await fetch(`/api/recent-files?limit=${limit}`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch recent files');
+  }
+  return response.json();
+}
+
+export async function recordFileAccess(id: string): Promise<void> {
+  await fetch(`/api/inp-files/${id}/access`, { method: 'POST' });
+}
+
+export async function exportFiles(fileIds: string[]): Promise<void> {
+  const response = await fetch('/api/export', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fileIds }),
+  });
+  
+  if (!response.ok) {
+    throw new Error('Failed to export files');
+  }
+  
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `swmm5-export-${Date.now()}.zip`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  window.URL.revokeObjectURL(url);
+}
+
+export async function exportDirectory(directory: string): Promise<void> {
+  const response = await fetch('/api/export', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ directory }),
+  });
+  
+  if (!response.ok) {
+    throw new Error('Failed to export directory');
+  }
+  
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${directory.replace(/[^a-z0-9]/gi, '_')}-${Date.now()}.zip`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  window.URL.revokeObjectURL(url);
+}

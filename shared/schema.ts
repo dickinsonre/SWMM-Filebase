@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -21,6 +21,8 @@ export const inpFiles = pgTable("inp_files", {
   description: text("description"),
   objectPath: text("object_path").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  isPinned: boolean("is_pinned").notNull().default(false),
+  lastAccessedAt: timestamp("last_accessed_at"),
 });
 
 export const insertUserSchema = createInsertSchema(users).pick({

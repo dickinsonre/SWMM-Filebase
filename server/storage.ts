@@ -1,6 +1,6 @@
 import { users, inpFiles, type User, type InsertUser, type InpFile, type InsertInpFile } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, or, ilike } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -14,6 +14,13 @@ export interface IStorage {
   deleteInpFile(id: string): Promise<void>;
   getInpFilesByDirectory(directory: string): Promise<InpFile[]>;
   deleteDirectory(directory: string): Promise<InpFile[]>;
+  
+  // Pinned and Recent files
+  togglePinFile(id: string): Promise<InpFile | undefined>;
+  updateLastAccessed(id: string): Promise<void>;
+  getPinnedFiles(): Promise<InpFile[]>;
+  getRecentFiles(limit: number): Promise<InpFile[]>;
+  searchFiles(query: string): Promise<InpFile[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -64,6 +71,56 @@ export class DatabaseStorage implements IStorage {
     const filesToDelete = await this.getInpFilesByDirectory(directory);
     await db.delete(inpFiles).where(eq(inpFiles.directory, directory));
     return filesToDelete;
+  }
+
+  async togglePinFile(id: string): Promise<InpFile | undefined> {
+    const file = await this.getInpFile(id);
+    if (!file) return undefined;
+    
+    const [updated] = await db
+      .update(inpFiles)
+      .set({ isPinned: !file.isPinned })
+      .where(eq(inpFiles.id, id))
+      .returning();
+    return updated;
+  }
+
+  async updateLastAccessed(id: string): Promise<void> {
+    await db
+      .update(inpFiles)
+      .set({ lastAccessedAt: new Date() })
+      .where(eq(inpFiles.id, id));
+  }
+
+  async getPinnedFiles(): Promise<InpFile[]> {
+    return await db
+      .select()
+      .from(inpFiles)
+      .where(eq(inpFiles.isPinned, true))
+      .orderBy(desc(inpFiles.lastAccessedAt));
+  }
+
+  async getRecentFiles(limit: number): Promise<InpFile[]> {
+    return await db
+      .select()
+      .from(inpFiles)
+      .orderBy(desc(inpFiles.lastAccessedAt))
+      .limit(limit);
+  }
+
+  async searchFiles(query: string): Promise<InpFile[]> {
+    const pattern = `%${query}%`;
+    return await db
+      .select()
+      .from(inpFiles)
+      .where(
+        or(
+          ilike(inpFiles.filename, pattern),
+          ilike(inpFiles.directory, pattern),
+          ilike(inpFiles.description, pattern)
+        )
+      )
+      .orderBy(desc(inpFiles.createdAt));
   }
 }
 
