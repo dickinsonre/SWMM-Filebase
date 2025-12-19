@@ -62,19 +62,35 @@ export async function getAllInpFiles(limit = 100, offset = 0): Promise<Paginated
   if (!response.ok) {
     throw new Error('Failed to fetch files');
   }
-  return response.json();
+  const text = await response.text();
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    console.error('JSON parse error at offset', offset, '- response length:', text.length);
+    throw new Error(`Failed to parse response at offset ${offset}`);
+  }
 }
 
 export async function getAllInpFilesFlat(): Promise<InpFile[]> {
   const allFiles: InpFile[] = [];
   let offset = 0;
-  const limit = 200;
+  const limit = 100; // Smaller batches
   
   while (true) {
-    const response = await getAllInpFiles(limit, offset);
-    allFiles.push(...response.files);
-    if (!response.hasMore) break;
-    offset += limit;
+    try {
+      const response = await getAllInpFiles(limit, offset);
+      allFiles.push(...response.files);
+      if (!response.hasMore) break;
+      offset += limit;
+    } catch (e) {
+      console.error('Error fetching files at offset', offset, e);
+      if (allFiles.length > 0) {
+        // Return what we have so far if we got some files
+        console.warn('Returning partial file list:', allFiles.length, 'files');
+        break;
+      }
+      throw e;
+    }
   }
   
   return allFiles;
