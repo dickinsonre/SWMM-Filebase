@@ -1,6 +1,6 @@
 import { users, inpFiles, type User, type InsertUser, type InpFile, type InsertInpFile } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, or, ilike } from "drizzle-orm";
+import { eq, desc, or, ilike, count } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -9,6 +9,7 @@ export interface IStorage {
   
   // SWMM5 File operations
   getAllInpFiles(): Promise<InpFile[]>;
+  getAllInpFilesPaginated(limit: number, offset: number): Promise<{ files: InpFile[], total: number }>;
   getInpFile(id: string): Promise<InpFile | undefined>;
   createInpFile(file: InsertInpFile): Promise<InpFile>;
   deleteInpFile(id: string): Promise<void>;
@@ -44,6 +45,20 @@ export class DatabaseStorage implements IStorage {
 
   async getAllInpFiles(): Promise<InpFile[]> {
     return await db.select().from(inpFiles).orderBy(desc(inpFiles.createdAt));
+  }
+
+  async getAllInpFilesPaginated(limit: number, offset: number): Promise<{ files: InpFile[], total: number }> {
+    const [countResult] = await db.select({ count: count() }).from(inpFiles);
+    const total = countResult?.count ?? 0;
+    
+    const files = await db
+      .select()
+      .from(inpFiles)
+      .orderBy(desc(inpFiles.createdAt))
+      .limit(limit)
+      .offset(offset);
+    
+    return { files, total };
   }
 
   async getInpFile(id: string): Promise<InpFile | undefined> {

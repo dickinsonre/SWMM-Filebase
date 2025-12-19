@@ -23,7 +23,7 @@ export function FileProvider({ children }: { children: ReactNode }) {
     try {
       setLoading(true);
       setError(null);
-      const data = await api.getAllInpFiles();
+      const data = await api.getAllInpFilesFlat();
       setFiles(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load files');

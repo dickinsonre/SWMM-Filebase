@@ -49,12 +49,35 @@ export interface InpFileWithContent extends InpFile {
   coordinates: CoordinateData | null;
 }
 
-export async function getAllInpFiles(): Promise<InpFile[]> {
-  const response = await fetch('/api/inp-files');
+export interface PaginatedFilesResponse {
+  files: InpFile[];
+  total: number;
+  limit: number;
+  offset: number;
+  hasMore: boolean;
+}
+
+export async function getAllInpFiles(limit = 100, offset = 0): Promise<PaginatedFilesResponse> {
+  const response = await fetch(`/api/inp-files?limit=${limit}&offset=${offset}`);
   if (!response.ok) {
     throw new Error('Failed to fetch files');
   }
   return response.json();
+}
+
+export async function getAllInpFilesFlat(): Promise<InpFile[]> {
+  const allFiles: InpFile[] = [];
+  let offset = 0;
+  const limit = 200;
+  
+  while (true) {
+    const response = await getAllInpFiles(limit, offset);
+    allFiles.push(...response.files);
+    if (!response.hasMore) break;
+    offset += limit;
+  }
+  
+  return allFiles;
 }
 
 export async function getInpFile(id: string): Promise<InpFileWithContent> {

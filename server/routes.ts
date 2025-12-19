@@ -22,18 +22,27 @@ export async function registerRoutes(
   
   app.get("/api/inp-files", async (req, res) => {
     try {
-      const files = await storage.getAllInpFiles();
-      const response = files.map(f => ({
-        id: f.id,
-        filename: f.filename,
-        directory: f.directory,
-        size: formatFileSize(f.size),
-        lastModified: f.lastModified.toISOString().split('T')[0],
-        nodeCount: f.nodeCount,
-        linkCount: f.linkCount,
-        subcatchmentCount: f.subcatchmentCount,
-        description: f.description || undefined
-      }));
+      const limit = parseInt(req.query.limit as string) || 100;
+      const offset = parseInt(req.query.offset as string) || 0;
+      
+      const { files, total } = await storage.getAllInpFilesPaginated(limit, offset);
+      const response = {
+        files: files.map(f => ({
+          id: f.id,
+          filename: f.filename,
+          directory: f.directory,
+          size: formatFileSize(f.size),
+          lastModified: f.lastModified.toISOString().split('T')[0],
+          nodeCount: f.nodeCount,
+          linkCount: f.linkCount,
+          subcatchmentCount: f.subcatchmentCount,
+          description: f.description || undefined
+        })),
+        total,
+        limit,
+        offset,
+        hasMore: offset + files.length < total
+      };
       res.json(response);
     } catch (error) {
       console.error('Error fetching files:', error);
