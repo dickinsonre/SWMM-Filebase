@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { parseInpFile } from "./inp-parser";
+import { parseInpFile, parseCoordinates } from "./inp-parser";
 import { ObjectStorageService } from "./objectStorage";
 import multer from "multer";
 
@@ -54,9 +54,12 @@ export async function registerRoutes(
         console.error('Error fetching file content from object storage:', err);
       }
       
+      const coordinates = fileContent ? parseCoordinates(fileContent) : null;
+      
       res.json({
         ...file,
         fileContent,
+        coordinates,
         size: formatFileSize(file.size),
         lastModified: file.lastModified.toISOString().split('T')[0],
       });
