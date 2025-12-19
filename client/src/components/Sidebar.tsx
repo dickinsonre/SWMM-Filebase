@@ -106,8 +106,10 @@ export function Sidebar() {
   };
 
   const handleDirectoryImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log("handleDirectoryImport called", e.target.files?.length);
     if (e.target.files && e.target.files.length > 0) {
       const inpFiles = Array.from(e.target.files).filter(f => f.name.toLowerCase().endsWith('.inp'));
+      console.log("Found .inp files:", inpFiles.length);
       
       if (inpFiles.length === 0) {
         toast({
