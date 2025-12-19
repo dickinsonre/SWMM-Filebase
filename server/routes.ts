@@ -41,35 +41,6 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/inp-files/:id", async (req, res) => {
-    try {
-      const file = await storage.getInpFile(req.params.id);
-      if (!file) {
-        return res.status(404).json({ error: 'File not found' });
-      }
-      
-      let fileContent = '';
-      try {
-        fileContent = await objectStorageService.getInpFileContent(file.objectPath);
-      } catch (err) {
-        console.error('Error fetching file content from object storage:', err);
-      }
-      
-      const coordinates = fileContent ? parseCoordinates(fileContent) : null;
-      
-      res.json({
-        ...file,
-        fileContent,
-        coordinates,
-        size: formatFileSize(file.size),
-        lastModified: file.lastModified.toISOString().split('T')[0],
-      });
-    } catch (error) {
-      console.error('Error fetching file:', error);
-      res.status(500).json({ error: 'Failed to fetch file' });
-    }
-  });
-
   app.get("/api/inp-files/compare", async (req, res) => {
     try {
       const { file1, file2 } = req.query;
@@ -118,6 +89,35 @@ export async function registerRoutes(
     } catch (error) {
       console.error('Error comparing files:', error);
       res.status(500).json({ error: 'Failed to compare files' });
+    }
+  });
+
+  app.get("/api/inp-files/:id", async (req, res) => {
+    try {
+      const file = await storage.getInpFile(req.params.id);
+      if (!file) {
+        return res.status(404).json({ error: 'File not found' });
+      }
+      
+      let fileContent = '';
+      try {
+        fileContent = await objectStorageService.getInpFileContent(file.objectPath);
+      } catch (err) {
+        console.error('Error fetching file content from object storage:', err);
+      }
+      
+      const coordinates = fileContent ? parseCoordinates(fileContent) : null;
+      
+      res.json({
+        ...file,
+        fileContent,
+        coordinates,
+        size: formatFileSize(file.size),
+        lastModified: file.lastModified.toISOString().split('T')[0],
+      });
+    } catch (error) {
+      console.error('Error fetching file:', error);
+      res.status(500).json({ error: 'Failed to fetch file' });
     }
   });
 
