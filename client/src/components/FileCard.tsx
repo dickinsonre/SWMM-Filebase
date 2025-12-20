@@ -186,22 +186,11 @@ export function FileCard({ file, onPinChange }: FileCardProps) {
   const handleRunSimulation = async () => {
     setSimulationLoading(true);
     try {
-      const fullFile = await getInpFile(file.id);
-      const inpContent = fullFile.fileContent;
-      
-      if (!inpContent) {
-        throw new Error("No file content available");
-      }
-
-      const response = await fetch("https://swmm-engine--robertdickinson.replit.app/api/simulate", {
+      const response = await fetch(`/api/simulate/${file.id}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          inp_content: inpContent,
-          filename: file.filename
-        }),
       });
 
       if (!response.ok) {

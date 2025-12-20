@@ -373,6 +373,46 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/simulate/:id", async (req, res) => {
+    try {
+      const file = await storage.getInpFile(req.params.id);
+      if (!file) {
+        return res.status(404).json({ error: 'File not found' });
+      }
+
+      let fileContent = '';
+      try {
+        fileContent = await objectStorageService.getInpFileContent(file.objectPath);
+      } catch (err) {
+        return res.status(500).json({ error: 'Failed to read file content' });
+      }
+
+      const response = await fetch("https://swmm-engine--robertdickinson.replit.app/api/simulate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          inp_content: fileContent,
+          filename: file.filename
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        return res.status(response.status).json({ 
+          error: errorData.error || `Simulation failed with status ${response.status}` 
+        });
+      }
+
+      const result = await response.json();
+      res.json(result);
+    } catch (error) {
+      console.error('Error running simulation:', error);
+      res.status(500).json({ error: 'Failed to run simulation' });
+    }
+  });
+
   return httpServer;
 }
 
