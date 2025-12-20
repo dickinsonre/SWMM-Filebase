@@ -32,6 +32,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { getInpFile } from "@/lib/api";
 import { MapVisualization } from "./MapVisualization";
+import { MinecraftMap } from "./MinecraftMap";
 
 interface FileCardProps {
   file: InpFile;
@@ -42,6 +43,7 @@ export function FileCard({ file, onPinChange }: FileCardProps) {
   const { removeFile } = useFiles();
   const [showContent, setShowContent] = useState(false);
   const [showMap, setShowMap] = useState(false);
+  const [showMinecraftMap, setShowMinecraftMap] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [fileContent, setFileContent] = useState("");
   const [coordinates, setCoordinates] = useState<CoordinateData | null>(null);
@@ -110,6 +112,24 @@ export function FileCard({ file, onPinChange }: FileCardProps) {
       const fullFile = await getInpFile(file.id);
       setCoordinates(fullFile.coordinates);
       setShowMap(true);
+      await recordFileAccess(file.id);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to load map data",
+        variant: "destructive"
+      });
+    } finally {
+      setMapLoading(false);
+    }
+  };
+
+  const handleShowMinecraftMap = async () => {
+    setMapLoading(true);
+    try {
+      const fullFile = await getInpFile(file.id);
+      setCoordinates(fullFile.coordinates);
+      setShowMinecraftMap(true);
       await recordFileAccess(file.id);
     } catch (error) {
       toast({
@@ -194,6 +214,10 @@ export function FileCard({ file, onPinChange }: FileCardProps) {
               <DropdownMenuItem onClick={handleShowMap} disabled={mapLoading} data-testid={`show-map-${file.id}`}>
                 <Map className="h-4 w-4 mr-2" />
                 {mapLoading ? "Loading..." : "Show Map"}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleShowMinecraftMap} disabled={mapLoading} data-testid={`show-minecraft-map-${file.id}`}>
+                <Map className="h-4 w-4 mr-2" />
+                {mapLoading ? "Loading..." : "Show Minecraft Map"}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleTogglePin} disabled={pinLoading} data-testid={`pin-file-${file.id}`}>
@@ -288,6 +312,32 @@ export function FileCard({ file, onPinChange }: FileCardProps) {
                   </p>
                   <p className="text-xs mt-4 max-w-md mx-auto">
                     Add node coordinates to your .inp file to visualize the model layout.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showMinecraftMap} onOpenChange={setShowMinecraftMap}>
+        <DialogContent className="max-w-5xl max-h-[85vh]">
+          <DialogHeader>
+            <DialogTitle className="font-mono flex items-center gap-2">
+              <Map className="h-5 w-5" />
+              Minecraft Map: {file.filename}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="h-[65vh]">
+            {coordinates && coordinates.nodes.length > 0 ? (
+              <MinecraftMap coordinates={coordinates} width={900} height={500} />
+            ) : (
+              <div className="h-full flex items-center justify-center bg-muted/30 rounded-lg border border-border">
+                <div className="text-center text-muted-foreground">
+                  <Map className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                  <p className="text-lg font-medium">No Coordinate Data</p>
+                  <p className="text-sm mt-2">
+                    This file does not contain a [COORDINATES] section.
                   </p>
                 </div>
               </div>
