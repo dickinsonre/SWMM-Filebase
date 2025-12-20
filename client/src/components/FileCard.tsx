@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FileText, Activity, GitBranch, Database, MoreVertical, Folder, Map, Eye, Loader2, Copy, Check, Pin, Download } from "lucide-react";
+import { FileText, Activity, GitBranch, Database, MoreVertical, Folder, Map, Eye, Loader2, Copy, Check, Pin, Download, Play } from "lucide-react";
 import { InpFile, CoordinateData, togglePinFile, exportFiles, recordFileAccess } from "@/lib/api";
 import { useFiles } from "@/context/FileContext";
 import { toast } from "@/hooks/use-toast";
@@ -53,6 +53,7 @@ export function FileCard({ file, onPinChange }: FileCardProps) {
   const [isPinned, setIsPinned] = useState(false);
   const [pinLoading, setPinLoading] = useState(false);
   const [exportLoading, setExportLoading] = useState(false);
+  const [simulationLoading, setSimulationLoading] = useState(false);
 
   const handleCopyContent = async () => {
     try {
@@ -182,6 +183,48 @@ export function FileCard({ file, onPinChange }: FileCardProps) {
     }
   };
 
+  const handleRunSimulation = async () => {
+    setSimulationLoading(true);
+    try {
+      const fullFile = await getInpFile(file.id);
+      const inpContent = fullFile.fileContent;
+      
+      if (!inpContent) {
+        throw new Error("No file content available");
+      }
+
+      const response = await fetch("https://swmm-engine--robertdickinson.replit.app/api/simulate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          inp_content: inpContent,
+          filename: file.filename
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Simulation failed with status ${response.status}`);
+      }
+
+      const result = await response.json();
+      toast({
+        title: "Simulation Complete",
+        description: result.message || `Simulation finished for ${file.filename}`,
+      });
+    } catch (error) {
+      toast({
+        title: "Simulation Failed",
+        description: error instanceof Error ? error.message : "Failed to run simulation",
+        variant: "destructive"
+      });
+    } finally {
+      setSimulationLoading(false);
+    }
+  };
+
   return (
     <>
       <Card className="group hover:border-primary/50 transition-all duration-300 hover:shadow-md border-border/60 bg-card/50 backdrop-blur-sm">
@@ -227,6 +270,10 @@ export function FileCard({ file, onPinChange }: FileCardProps) {
               <DropdownMenuItem onClick={handleExport} disabled={exportLoading} data-testid={`export-file-${file.id}`}>
                 <Download className="h-4 w-4 mr-2" />
                 {exportLoading ? "Exporting..." : "Export as ZIP"}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleRunSimulation} disabled={simulationLoading} data-testid={`run-simulation-${file.id}`}>
+                <Play className="h-4 w-4 mr-2" />
+                {simulationLoading ? "Running..." : "Run Simulation"}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem className="text-destructive" onClick={() => setShowDeleteConfirm(true)} data-testid={`delete-file-${file.id}`}>
