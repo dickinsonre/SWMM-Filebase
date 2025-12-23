@@ -2,10 +2,11 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FileText, Activity, GitBranch, Database, MoreVertical, Folder, Map, Eye, Loader2, Copy, Check, Pin, Download, Play } from "lucide-react";
+import { FileText, Activity, GitBranch, Database, MoreVertical, Folder, Map, Eye, Loader2, Copy, Check, Pin, Download, Play, FileOutput } from "lucide-react";
 import { InpFile, CoordinateData, togglePinFile, exportFiles, recordFileAccess } from "@/lib/api";
 import { useFiles } from "@/context/FileContext";
 import { toast } from "@/hooks/use-toast";
+import { runSwmmSimulation } from "@/lib/swmmEngine";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -54,6 +55,8 @@ export function FileCard({ file, onPinChange }: FileCardProps) {
   const [pinLoading, setPinLoading] = useState(false);
   const [exportLoading, setExportLoading] = useState(false);
   const [simulationLoading, setSimulationLoading] = useState(false);
+  const [showReport, setShowReport] = useState(false);
+  const [reportContent, setReportContent] = useState("");
 
   const handleCopyContent = async () => {
     try {
@@ -186,23 +189,29 @@ export function FileCard({ file, onPinChange }: FileCardProps) {
   const handleRunSimulation = async () => {
     setSimulationLoading(true);
     try {
-      const response = await fetch(`/api/simulate/${file.id}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `Simulation failed with status ${response.status}`);
+      const fullFile = await getInpFile(file.id);
+      if (!fullFile.fileContent) {
+        throw new Error("File content is empty");
       }
 
-      const result = await response.json();
-      toast({
-        title: "Simulation Complete",
-        description: result.message || `Simulation finished for ${file.filename}`,
-      });
+      const result = await runSwmmSimulation(fullFile.fileContent, file.filename);
+      
+      if (result.success) {
+        setReportContent(result.reportContent);
+        setShowReport(true);
+        toast({
+          title: "Simulation Complete",
+          description: result.message,
+        });
+      } else {
+        setReportContent(result.reportContent || result.message);
+        setShowReport(true);
+        toast({
+          title: "Simulation Error",
+          description: result.message,
+          variant: "destructive"
+        });
+      }
     } catch (error) {
       toast({
         title: "Simulation Failed",
@@ -401,6 +410,41 @@ export function FileCard({ file, onPinChange }: FileCardProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={showReport} onOpenChange={setShowReport}>
+        <DialogContent className="max-w-4xl max-h-[80vh]">
+          <DialogHeader>
+            <div className="flex items-center justify-between">
+              <DialogTitle className="font-mono flex items-center gap-2">
+                <FileOutput className="h-5 w-5" />
+                Simulation Report: {file.filename}
+              </DialogTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  await navigator.clipboard.writeText(reportContent);
+                  toast({
+                    title: "Copied",
+                    description: "Report content copied to clipboard",
+                  });
+                }}
+                className="gap-2"
+                data-testid="copy-report-button"
+              >
+                <Copy className="h-4 w-4" />
+                Copy Report
+              </Button>
+            </div>
+          </DialogHeader>
+          <Textarea 
+            value={reportContent} 
+            readOnly 
+            className="font-mono text-xs h-[60vh] resize-none"
+            data-testid="report-content-textarea"
+          />
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

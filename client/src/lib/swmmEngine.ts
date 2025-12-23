@@ -35,31 +35,39 @@ async function loadSwmmModule(): Promise<SwmmModule> {
   }
 
   moduleLoading = new Promise<SwmmModule>((resolve, reject) => {
+    const win = window as unknown as { Module?: Partial<SwmmModule> };
+    
+    win.Module = {
+      onRuntimeInitialized: () => {
+        moduleInstance = win.Module as SwmmModule;
+        resolve(moduleInstance);
+      }
+    };
+
     const script = document.createElement("script");
     script.src = "/swmm/js.js";
     script.async = true;
 
-    script.onload = () => {
-      const checkModule = () => {
-        const win = window as unknown as { Module?: SwmmModule };
-        if (win.Module && win.Module.calledRun) {
-          moduleInstance = win.Module;
-          resolve(moduleInstance);
-        } else if (win.Module) {
-          win.Module.onRuntimeInitialized = () => {
-            moduleInstance = win.Module!;
-            resolve(moduleInstance);
-          };
-        } else {
-          setTimeout(checkModule, 100);
-        }
-      };
-      checkModule();
-    };
+    let timeout: ReturnType<typeof setTimeout>;
 
     script.onerror = () => {
+      clearTimeout(timeout);
       moduleLoading = null;
+      delete win.Module;
       reject(new Error("Failed to load SWMM WebAssembly module"));
+    };
+
+    timeout = setTimeout(() => {
+      if (!moduleInstance) {
+        moduleLoading = null;
+        reject(new Error("SWMM WebAssembly module load timeout"));
+      }
+    }, 30000);
+
+    const originalCallback = win.Module.onRuntimeInitialized;
+    win.Module.onRuntimeInitialized = () => {
+      clearTimeout(timeout);
+      if (originalCallback) originalCallback();
     };
 
     document.head.appendChild(script);
