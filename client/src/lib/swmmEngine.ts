@@ -1,19 +1,17 @@
+interface SwmmModule {
+  FS: {
+    writeFile: (path: string, data: string | Uint8Array) => void;
+    readFile: (path: string, opts?: { encoding?: string }) => string | Uint8Array;
+    unlink: (path: string) => void;
+  };
+  cwrap: (name: string, returnType: string, argTypes: string[]) => (...args: string[]) => number;
+  onRuntimeInitialized?: () => void;
+  calledRun?: boolean;
+}
+
 declare global {
   interface Window {
-    Module: {
-      onRuntimeInitialized?: () => void;
-      calledRun?: boolean;
-    };
-    FS: {
-      writeFile: (path: string, data: string | Uint8Array) => void;
-      readFile: (path: string, opts?: { encoding?: string }) => string | Uint8Array;
-      unlink: (path: string) => void;
-      createPath: (parent: string, path: string, canRead: boolean, canWrite: boolean) => void;
-      createDataFile: (parent: string, name: string, data: string | Uint8Array, canRead: boolean, canWrite: boolean) => void;
-      findObject: (path: string) => unknown;
-      ignorePermissions: boolean;
-    };
-    swmm_run: (inpFile: string, rptFile: string, outFile: string) => number;
+    Module: SwmmModule;
   }
 }
 
@@ -26,24 +24,29 @@ interface SimulationResult {
 }
 
 let moduleLoaded = false;
-let moduleLoading: Promise<void> | null = null;
+let moduleLoading: Promise<SwmmModule> | null = null;
 
-async function loadSwmmModule(): Promise<void> {
-  if (moduleLoaded) {
-    return;
+async function loadSwmmModule(): Promise<SwmmModule> {
+  if (moduleLoaded && window.Module) {
+    return window.Module;
   }
 
   if (moduleLoading) {
     return moduleLoading;
   }
 
-  moduleLoading = new Promise<void>((resolve, reject) => {
-    window.Module = {
+  moduleLoading = new Promise<SwmmModule>((resolve, reject) => {
+    const existingModule = (window as { Module?: Partial<SwmmModule> }).Module;
+    
+    const moduleConfig: Partial<SwmmModule> = {
+      ...existingModule,
       onRuntimeInitialized: () => {
         moduleLoaded = true;
-        resolve();
+        resolve(window.Module);
       }
     };
+    
+    (window as { Module: Partial<SwmmModule> }).Module = moduleConfig as SwmmModule;
 
     const script = document.createElement("script");
     script.src = "/swmm/js.js";
@@ -54,7 +57,6 @@ async function loadSwmmModule(): Promise<void> {
     script.onerror = () => {
       clearTimeout(timeout);
       moduleLoading = null;
-      delete (window as { Module?: unknown }).Module;
       reject(new Error("Failed to load SWMM WebAssembly module"));
     };
 
@@ -65,8 +67,8 @@ async function loadSwmmModule(): Promise<void> {
       }
     }, 30000);
 
-    const originalCallback = window.Module.onRuntimeInitialized;
-    window.Module.onRuntimeInitialized = () => {
+    const originalCallback = moduleConfig.onRuntimeInitialized;
+    moduleConfig.onRuntimeInitialized = () => {
       clearTimeout(timeout);
       if (originalCallback) originalCallback();
     };
@@ -82,7 +84,7 @@ export async function runSwmmSimulation(
   filename: string
 ): Promise<SimulationResult> {
   try {
-    await loadSwmmModule();
+    const Module = await loadSwmmModule();
 
     const timestamp = Date.now();
     const inputPath = `/input_${timestamp}.inp`;
@@ -90,12 +92,7 @@ export async function runSwmmSimulation(
     const outputPath = `/output_${timestamp}.out`;
 
     try {
-      window.FS.ignorePermissions = true;
-      const existingFile = window.FS.findObject(inputPath.slice(1));
-      if (existingFile) {
-        window.FS.unlink(inputPath);
-      }
-      window.FS.createDataFile("/", inputPath.slice(1), inpContent, true, true);
+      Module.FS.writeFile(inputPath, inpContent);
     } catch (err) {
       return {
         success: false,
@@ -108,7 +105,8 @@ export async function runSwmmSimulation(
 
     let errorCode: number;
     try {
-      errorCode = window.swmm_run(inputPath, reportPath, outputPath);
+      const swmm_run = Module.cwrap("swmm_run", "number", ["string", "string", "string"]);
+      errorCode = swmm_run(inputPath, reportPath, outputPath);
     } catch (err) {
       return {
         success: false,
@@ -121,7 +119,7 @@ export async function runSwmmSimulation(
 
     let reportContent = "";
     try {
-      reportContent = window.FS.readFile(reportPath, {
+      reportContent = Module.FS.readFile(reportPath, {
         encoding: "utf8",
       }) as string;
     } catch {
@@ -130,19 +128,19 @@ export async function runSwmmSimulation(
 
     let outputData: Uint8Array | null = null;
     try {
-      outputData = window.FS.readFile(outputPath) as Uint8Array;
+      outputData = Module.FS.readFile(outputPath) as Uint8Array;
     } catch {
       outputData = null;
     }
 
     try {
-      window.FS.unlink(inputPath);
+      Module.FS.unlink(inputPath);
     } catch {}
     try {
-      window.FS.unlink(reportPath);
+      Module.FS.unlink(reportPath);
     } catch {}
     try {
-      window.FS.unlink(outputPath);
+      Module.FS.unlink(outputPath);
     } catch {}
 
     const success = errorCode === 0;
