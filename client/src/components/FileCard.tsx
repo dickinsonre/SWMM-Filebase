@@ -479,7 +479,7 @@ export function FileCard({ file, onPinChange }: FileCardProps) {
                 Simulation Report: {file.filename}
               </DialogTitle>
               <Button
-                variant="outline"
+                variant="secondary"
                 size="sm"
                 onClick={async () => {
                   await navigator.clipboard.writeText(reportContent);
@@ -488,7 +488,7 @@ export function FileCard({ file, onPinChange }: FileCardProps) {
                     description: "Report content copied to clipboard",
                   });
                 }}
-                className="gap-2"
+                className="gap-2 bg-primary/10 hover:bg-primary/20 text-primary border-0"
                 data-testid="copy-report-button"
               >
                 <Copy className="h-4 w-4" />
