@@ -1,0 +1,280 @@
+interface SWMMModule {
+  ccall: (name: string, returnType: string, argTypes: string[], args: any[]) => any;
+  cwrap: (name: string, returnType: string, argTypes: string[]) => (...args: any[]) => any;
+  FS: {
+    writeFile: (path: string, data: string | Uint8Array) => void;
+    readFile: (path: string, opts?: { encoding?: string }) => Uint8Array | string;
+    unlink: (path: string) => void;
+    mkdir: (path: string) => void;
+  };
+  allocateUTF8: (str: string) => number;
+  UTF8ToString: (ptr: number) => string;
+  stringToUTF8: (str: string, ptr: number, maxBytes: number) => void;
+  _malloc: (size: number) => number;
+  _free: (ptr: number) => void;
+}
+
+export interface SimulationProgress {
+  elapsedTime: number;
+  progress: number;
+  currentDate: string;
+}
+
+export interface SimulationResult {
+  success: boolean;
+  errorCode: number;
+  errorMessage: string;
+  runoffError: number;
+  flowError: number;
+  qualityError: number;
+  reportContent: string;
+  outputContent: Uint8Array | null;
+}
+
+export type ProgressCallback = (progress: SimulationProgress) => void;
+
+declare global {
+  interface Window {
+    createSWMMModule: () => Promise<SWMMModule>;
+  }
+}
+
+class SWMMEngine {
+  private module: SWMMModule | null = null;
+  private isLoading = false;
+  private loadPromise: Promise<void> | null = null;
+  private scriptLoaded = false;
+
+  async init(): Promise<void> {
+    if (this.module) return;
+    if (this.loadPromise) return this.loadPromise;
+    
+    this.isLoading = true;
+    this.loadPromise = this.loadModule();
+    
+    try {
+      await this.loadPromise;
+    } finally {
+      this.isLoading = false;
+    }
+  }
+
+  private loadScript(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (this.scriptLoaded) {
+        resolve();
+        return;
+      }
+      
+      const script = document.createElement('script');
+      script.src = '/wasm/swmm5.js';
+      script.onload = () => {
+        this.scriptLoaded = true;
+        resolve();
+      };
+      script.onerror = () => reject(new Error('Failed to load SWMM script'));
+      document.head.appendChild(script);
+    });
+  }
+
+  private async loadModule(): Promise<void> {
+    await this.loadScript();
+    
+    if (!window.createSWMMModule) {
+      throw new Error('SWMM module factory not available');
+    }
+    
+    this.module = await window.createSWMMModule();
+    
+    try {
+      this.module!.FS.mkdir('/work');
+    } catch {
+      // Directory may already exist
+    }
+  }
+
+  isReady(): boolean {
+    return this.module !== null;
+  }
+
+  async run(
+    inputContent: string,
+    onProgress?: ProgressCallback
+  ): Promise<SimulationResult> {
+    await this.init();
+    
+    if (!this.module) {
+      throw new Error('SWMM module not initialized');
+    }
+
+    const inputPath = '/work/input.inp';
+    const reportPath = '/work/report.rpt';
+    const outputPath = '/work/output.out';
+
+    try {
+      this.module.FS.writeFile(inputPath, inputContent);
+    } catch {
+      try {
+        this.module.FS.mkdir('/work');
+      } catch {}
+      this.module.FS.writeFile(inputPath, inputContent);
+    }
+
+    const inputPtr = this.module.allocateUTF8(inputPath);
+    const reportPtr = this.module.allocateUTF8(reportPath);
+    const outputPtr = this.module.allocateUTF8(outputPath);
+
+    let errorCode = 0;
+    let reportContent = '';
+    let outputContent: Uint8Array | null = null;
+
+    try {
+      // Use simple swmm_run for now (step-by-step is more complex)
+      errorCode = this.module.ccall('swmm_run', 'number', ['number', 'number', 'number'], [inputPtr, reportPtr, outputPtr]);
+
+      if (onProgress) {
+        onProgress({
+          elapsedTime: 100,
+          progress: 1.0,
+          currentDate: new Date().toISOString()
+        });
+      }
+
+      try {
+        reportContent = this.module.FS.readFile(reportPath, { encoding: 'utf8' }) as string;
+      } catch {
+        reportContent = '';
+      }
+
+      try {
+        outputContent = this.module.FS.readFile(outputPath) as Uint8Array;
+      } catch {
+        outputContent = null;
+      }
+
+      // Clean up files
+      try {
+        this.module.FS.unlink(inputPath);
+        this.module.FS.unlink(reportPath);
+        this.module.FS.unlink(outputPath);
+      } catch {}
+
+      return {
+        success: errorCode === 0,
+        errorCode,
+        errorMessage: this.getErrorMessage(errorCode),
+        runoffError: 0,
+        flowError: 0,
+        qualityError: 0,
+        reportContent,
+        outputContent
+      };
+    } finally {
+      this.module._free(inputPtr);
+      this.module._free(reportPtr);
+      this.module._free(outputPtr);
+    }
+  }
+
+  getVersion(): string {
+    if (!this.module) return 'Not loaded';
+    const version = this.module.ccall('swmm_getVersion', 'number', [], []);
+    const major = Math.floor(version / 10000);
+    const minor = Math.floor((version % 10000) / 1000);
+    const patch = version % 1000;
+    return `${major}.${minor}.${patch}`;
+  }
+
+  private getErrorMessage(code: number): string {
+    const errors: Record<number, string> = {
+      0: 'No error',
+      101: 'Memory allocation error',
+      103: 'No input data',
+      105: 'Cannot open rainfall file',
+      107: 'Cannot open climatology file',
+      108: 'Cannot open hydrograph file',
+      109: 'Cannot open RDII file',
+      111: 'Cannot open input file',
+      113: 'Cannot open report file',
+      114: 'Cannot open scratch rainfall file',
+      115: 'Cannot open scratch RDII file',
+      117: 'Cannot open output file',
+      119: 'Cannot open scratch runoff file',
+      121: 'Cannot open scratch routing file',
+      191: 'Invalid date/time value',
+      193: 'Option keyword undefined',
+      195: 'Invalid option value',
+      200: 'Too many items defined',
+      201: 'Undefined node',
+      203: 'Undefined link',
+      205: 'Undefined time series',
+      207: 'Undefined curve',
+      209: 'Undefined rain gage',
+      211: 'Undefined land use',
+      213: 'Undefined pollutant',
+      215: 'Undefined aquifer',
+      217: 'Undefined groundwater',
+      219: 'Undefined unit hydrograph',
+      221: 'Undefined transect',
+      223: 'Undefined shape',
+      225: 'Undefined LID control',
+      227: 'Undefined control',
+      229: 'Undefined external inlet',
+      231: 'Undefined street',
+      233: 'Undefined inlet',
+      301: 'Subcatchment outlet is another subcatchment',
+      303: 'Node outlet is the same as its inlet',
+      305: 'Divider outlet link must be part of connected network',
+      307: 'Cannot compute link volume',
+      309: 'Cannot compute link slope',
+      311: 'Cannot reverse link in loop',
+      313: 'Downstream node at higher level than upstream node',
+      315: 'Pump inlet and outlet at same level',
+      317: 'Regulator inlet at same level as outlet',
+      319: 'Weir outlet at higher level than inlet',
+      321: 'Orifice outlet at higher level than inlet',
+      323: 'Conduit has negative slope',
+      325: 'Conduit shape requires max. depth',
+      327: 'Link does not connect two separate nodes',
+      329: 'Link routing computed in wrong direction',
+      331: 'Pump has no pump curve',
+      333: 'Storage unit has no storage curve',
+      335: 'Pump has invalid pump curve',
+      337: 'Diversion has no diversion curve',
+      339: 'Outlet has no rating curve',
+      341: 'Cross-section has invalid shape',
+      343: 'Transect has too few stations',
+      345: 'Duplicate transect station',
+      347: 'Invalid rain gage interval',
+      349: 'Invalid subcatchment width',
+      351: 'Invalid subcatchment slope',
+      353: 'Invalid subcatchment area',
+      355: 'Invalid depth for ponding area',
+      357: 'Invalid depth for storage unit',
+      359: 'Invalid depth for impervious area',
+      361: 'Invalid invert for junction',
+      363: 'Invalid invert for outfall',
+      365: 'Invalid crown for node',
+      367: 'Invalid invert for divider',
+      369: 'Invalid offset for link',
+      371: 'Invalid length for conduit',
+      373: 'Invalid roughness for conduit',
+      375: 'Invalid depth for conduit',
+      377: 'Invalid inlet location for conduit',
+      379: 'Invalid outlet location for conduit',
+      381: 'Invalid setting for regulator',
+      383: 'Invalid initial flow for conduit',
+      385: 'Invalid aquifer properties',
+      387: 'Invalid groundwater properties',
+      389: 'Incompatible infiltration method',
+      391: 'Invalid evaporation data',
+      393: 'Invalid climatology data',
+      395: 'Invalid pollutant data',
+      397: 'Invalid curve data',
+      399: 'Invalid time series data'
+    };
+    return errors[code] || `Unknown error (code: ${code})`;
+  }
+}
+
+export const swmmEngine = new SWMMEngine();

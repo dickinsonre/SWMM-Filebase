@@ -3,16 +3,22 @@ declare global {
     Module: {
       onRuntimeInitialized?: () => void;
       calledRun?: boolean;
+      _swmm_run?: (inputPath: number, reportPath: number, outputPath: number) => number;
+      cwrap?: (name: string, returnType: string, argTypes: string[]) => (...args: unknown[]) => unknown;
+      FS_createPath?: (parent: string, path: string, canRead: boolean, canWrite: boolean) => void;
+      FS_createDataFile?: (parent: string, name: string, data: string | ArrayBufferView, canRead: boolean, canWrite: boolean, canOwn?: boolean) => void;
+      FS_unlink?: (path: string) => void;
+      FS?: {
+        readFile: (path: string, opts?: { encoding?: string }) => string | Uint8Array;
+        writeFile: (path: string, data: string | ArrayBufferView) => void;
+        unlink: (path: string) => void;
+        mkdir: (path: string) => void;
+      };
+      allocateUTF8?: (str: string) => number;
+      _free?: (ptr: number) => void;
+      stringToUTF8?: (str: string, outPtr: number, maxBytesToWrite: number) => void;
+      _malloc?: (size: number) => number;
     };
-    FS: {
-      createPath: (parent: string, path: string, canRead: boolean, canWrite: boolean) => void;
-      createDataFile: (parent: string, name: string, data: string | ArrayBufferView, canRead: boolean, canWrite: boolean) => void;
-      readFile: (path: string, opts?: { encoding?: string }) => string | Uint8Array;
-      unlink: (path: string) => void;
-      findObject: (path: string) => unknown | null;
-      ignorePermissions: boolean;
-    };
-    swmm_run: (inputPath: string, reportPath: string, outputPath: string) => number;
   }
 }
 
@@ -26,16 +32,22 @@ interface SimulationResult {
 
 let moduleLoaded = false;
 let moduleLoading: Promise<void> | null = null;
+let swmmRunWrapped: ((input: string, report: string, output: string) => number) | null = null;
 
 function isModuleReady(): boolean {
-  return typeof window.FS !== "undefined" && 
-         typeof window.FS.createDataFile === "function" &&
-         typeof window.swmm_run === "function";
+  const m = window.Module;
+  if (!m) return false;
+  
+  const hasSwmmRun = typeof m._swmm_run === "function" || typeof m.cwrap === "function";
+  const hasFS = typeof m.FS_createDataFile === "function" || Boolean(m.FS && typeof m.FS.writeFile === "function");
+  
+  return hasSwmmRun && hasFS;
 }
 
 async function loadSwmmModule(): Promise<void> {
   if (isModuleReady()) {
     moduleLoaded = true;
+    initSwmmRun();
     return;
   }
 
@@ -51,9 +63,10 @@ async function loadSwmmModule(): Promise<void> {
         if (isModuleReady()) {
           clearInterval(checkReady);
           moduleLoaded = true;
+          initSwmmRun();
           resolve();
         }
-      }, 50);
+      }, 100);
       
       setTimeout(() => {
         clearInterval(checkReady);
@@ -67,6 +80,7 @@ async function loadSwmmModule(): Promise<void> {
     window.Module = {
       onRuntimeInitialized: () => {
         moduleLoaded = true;
+        initSwmmRun();
         resolve();
       }
     };
@@ -89,9 +103,10 @@ async function loadSwmmModule(): Promise<void> {
           clearInterval(checkReady);
           clearTimeout(timeout);
           moduleLoaded = true;
+          initSwmmRun();
           resolve();
         }
-      }, 50);
+      }, 100);
     };
 
     timeout = setTimeout(() => {
@@ -107,6 +122,84 @@ async function loadSwmmModule(): Promise<void> {
   return moduleLoading;
 }
 
+function initSwmmRun(): void {
+  const m = window.Module;
+  if (!m) return;
+  
+  if (m.cwrap && !swmmRunWrapped) {
+    try {
+      swmmRunWrapped = m.cwrap("swmm_run", "number", ["string", "string", "string"]) as (input: string, report: string, output: string) => number;
+    } catch {
+      swmmRunWrapped = null;
+    }
+  }
+}
+
+function writeFile(path: string, content: string): boolean {
+  const m = window.Module;
+  if (!m) return false;
+  
+  try {
+    const dir = path.substring(0, path.lastIndexOf("/")) || "/";
+    const filename = path.substring(path.lastIndexOf("/") + 1);
+    
+    if (m.FS && m.FS.writeFile) {
+      m.FS.writeFile(path, content);
+      return true;
+    }
+    
+    if (m.FS_createDataFile) {
+      try {
+        if (m.FS_unlink) {
+          m.FS_unlink(path);
+        }
+      } catch {}
+      m.FS_createDataFile(dir, filename, content, true, true);
+      return true;
+    }
+  } catch (err) {
+    console.error("writeFile error:", err);
+  }
+  return false;
+}
+
+function readFile(path: string): string | null {
+  const m = window.Module;
+  if (!m || !m.FS) return null;
+  
+  try {
+    const result = m.FS.readFile(path, { encoding: "utf8" });
+    return result as string;
+  } catch {
+    return null;
+  }
+}
+
+function readFileBinary(path: string): Uint8Array | null {
+  const m = window.Module;
+  if (!m || !m.FS) return null;
+  
+  try {
+    const result = m.FS.readFile(path);
+    return result as Uint8Array;
+  } catch {
+    return null;
+  }
+}
+
+function unlinkFile(path: string): void {
+  const m = window.Module;
+  if (!m) return;
+  
+  try {
+    if (m.FS && m.FS.unlink) {
+      m.FS.unlink(path);
+    } else if (m.FS_unlink) {
+      m.FS_unlink(path);
+    }
+  } catch {}
+}
+
 export async function runSwmmSimulation(
   inpContent: string,
   filename: string
@@ -114,43 +207,65 @@ export async function runSwmmSimulation(
   try {
     await loadSwmmModule();
 
-    if (!isModuleReady()) {
+    const m = window.Module;
+    if (!m) {
       return {
         success: false,
         errorCode: -1,
         reportContent: "",
         outputData: null,
-        message: "SWMM module not properly initialized - FS or swmm_run not available",
+        message: "SWMM module not available",
+      };
+    }
+
+    if (!swmmRunWrapped && !m._swmm_run) {
+      return {
+        success: false,
+        errorCode: -1,
+        reportContent: "",
+        outputData: null,
+        message: "SWMM module not properly initialized - swmm_run not available",
       };
     }
 
     const timestamp = Date.now();
-    const inputFile = `input_${timestamp}.inp`;
-    const reportFile = `report_${timestamp}.rpt`;
-    const outputFile = `output_${timestamp}.out`;
+    const inputPath = `/input_${timestamp}.inp`;
+    const reportPath = `/report_${timestamp}.rpt`;
+    const outputPath = `/output_${timestamp}.out`;
 
-    try {
-      window.FS.ignorePermissions = true;
-      
-      const existingInput = window.FS.findObject(`/${inputFile}`);
-      if (existingInput) {
-        window.FS.unlink(`/${inputFile}`);
-      }
-      
-      window.FS.createDataFile("/", inputFile, inpContent, true, true);
-    } catch (err) {
+    if (!writeFile(inputPath, inpContent)) {
       return {
         success: false,
         errorCode: -1,
         reportContent: "",
         outputData: null,
-        message: `Failed to write input file: ${err}`,
+        message: "Failed to write input file to virtual filesystem",
       };
     }
 
     let errorCode: number;
     try {
-      errorCode = window.swmm_run(`/${inputFile}`, `/${reportFile}`, `/${outputFile}`);
+      if (swmmRunWrapped) {
+        errorCode = swmmRunWrapped(inputPath, reportPath, outputPath);
+      } else if (m._swmm_run && m.allocateUTF8 && m._free) {
+        const inputPtr = m.allocateUTF8(inputPath);
+        const reportPtr = m.allocateUTF8(reportPath);
+        const outputPtr = m.allocateUTF8(outputPath);
+        
+        errorCode = m._swmm_run(inputPtr, reportPtr, outputPtr);
+        
+        m._free(inputPtr);
+        m._free(reportPtr);
+        m._free(outputPtr);
+      } else {
+        return {
+          success: false,
+          errorCode: -1,
+          reportContent: "",
+          outputData: null,
+          message: "SWMM module missing required functions for execution",
+        };
+      }
     } catch (err) {
       return {
         success: false,
@@ -161,31 +276,12 @@ export async function runSwmmSimulation(
       };
     }
 
-    let reportContent = "";
-    try {
-      reportContent = window.FS.readFile(`/${reportFile}`, {
-        encoding: "utf8",
-      }) as string;
-    } catch {
-      reportContent = "Report file not generated";
-    }
+    const reportContent = readFile(reportPath) || "Report file not generated";
+    const outputData = readFileBinary(outputPath);
 
-    let outputData: Uint8Array | null = null;
-    try {
-      outputData = window.FS.readFile(`/${outputFile}`) as Uint8Array;
-    } catch {
-      outputData = null;
-    }
-
-    try {
-      window.FS.unlink(`/${inputFile}`);
-    } catch {}
-    try {
-      window.FS.unlink(`/${reportFile}`);
-    } catch {}
-    try {
-      window.FS.unlink(`/${outputFile}`);
-    } catch {}
+    unlinkFile(inputPath);
+    unlinkFile(reportPath);
+    unlinkFile(outputPath);
 
     const success = errorCode === 0;
     let message = "";
