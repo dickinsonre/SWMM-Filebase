@@ -275,7 +275,7 @@ export function FileCard({ file, onPinChange }: FileCardProps) {
               <FileText className="h-5 w-5" />
             </div>
             <div>
-              <CardTitle className="text-base font-medium font-mono tracking-tight text-foreground/90">
+              <CardTitle className="text-base font-medium font-mono tracking-tight text-foreground/90 break-words max-w-[180px]">
                 {file.filename}
               </CardTitle>
               <div className="flex items-center text-xs text-muted-foreground mt-1 gap-1">
