@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FileText, Activity, GitBranch, Database, MoreVertical, Folder, Map, Eye, Loader2, Copy, Check, Pin, Download, Play, FileOutput, Save } from "lucide-react";
+import { FileText, Activity, GitBranch, Database, MoreVertical, Folder, Map, Eye, Loader2, Copy, Check, Pin, Download, Play, FileOutput, Save, X } from "lucide-react";
 import { InpFile, CoordinateData, togglePinFile, exportFiles, recordFileAccess, updateInpFileContent } from "@/lib/api";
 import { useFiles } from "@/context/FileContext";
 import { toast } from "@/hooks/use-toast";
@@ -478,22 +478,34 @@ export function FileCard({ file, onPinChange }: FileCardProps) {
                 <FileOutput className="h-5 w-5" />
                 Simulation Report: {file.filename}
               </DialogTitle>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={async () => {
-                  await navigator.clipboard.writeText(reportContent);
-                  toast({
-                    title: "Copied",
-                    description: "Report content copied to clipboard",
-                  });
-                }}
-                className="gap-2 bg-primary/10 hover:bg-primary/20 text-primary border-0"
-                data-testid="copy-report-button"
-              >
-                <Copy className="h-4 w-4" />
-                Copy Report
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(reportContent);
+                    toast({
+                      title: "Copied",
+                      description: "Report content copied to clipboard",
+                    });
+                  }}
+                  className="gap-2 bg-primary/10 hover:bg-primary/20 text-primary border-0"
+                  data-testid="copy-report-button"
+                >
+                  <Copy className="h-4 w-4" />
+                  Copy Report
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowReport(false)}
+                  className="gap-2"
+                  data-testid="close-report-button"
+                >
+                  <X className="h-4 w-4" />
+                  Close
+                </Button>
+              </div>
             </div>
           </DialogHeader>
           <Textarea 
