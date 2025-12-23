@@ -22,6 +22,9 @@ export interface IStorage {
   getPinnedFiles(): Promise<InpFile[]>;
   getRecentFiles(limit: number): Promise<InpFile[]>;
   searchFiles(query: string): Promise<InpFile[]>;
+  
+  // Update file metadata after content edit
+  updateFileMetadata(id: string, metadata: { nodeCount: number; linkCount: number; subcatchmentCount: number; size: number }): Promise<InpFile | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -136,6 +139,21 @@ export class DatabaseStorage implements IStorage {
         )
       )
       .orderBy(desc(inpFiles.createdAt));
+  }
+
+  async updateFileMetadata(id: string, metadata: { nodeCount: number; linkCount: number; subcatchmentCount: number; size: number }): Promise<InpFile | undefined> {
+    const [updated] = await db
+      .update(inpFiles)
+      .set({
+        nodeCount: metadata.nodeCount,
+        linkCount: metadata.linkCount,
+        subcatchmentCount: metadata.subcatchmentCount,
+        size: metadata.size,
+        lastModified: new Date()
+      })
+      .where(eq(inpFiles.id, id))
+      .returning();
+    return updated;
   }
 }
 

@@ -2,8 +2,8 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FileText, Activity, GitBranch, Database, MoreVertical, Folder, Map, Eye, Loader2, Copy, Check, Pin, Download, Play, FileOutput } from "lucide-react";
-import { InpFile, CoordinateData, togglePinFile, exportFiles, recordFileAccess } from "@/lib/api";
+import { FileText, Activity, GitBranch, Database, MoreVertical, Folder, Map, Eye, Loader2, Copy, Check, Pin, Download, Play, FileOutput, Save } from "lucide-react";
+import { InpFile, CoordinateData, togglePinFile, exportFiles, recordFileAccess, updateInpFileContent } from "@/lib/api";
 import { useFiles } from "@/context/FileContext";
 import { toast } from "@/hooks/use-toast";
 import { runSwmmSimulation } from "@/lib/swmmEngine";
@@ -57,6 +57,9 @@ export function FileCard({ file, onPinChange }: FileCardProps) {
   const [simulationLoading, setSimulationLoading] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [reportContent, setReportContent] = useState("");
+  const [originalContent, setOriginalContent] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
 
   const handleCopyContent = async () => {
     try {
@@ -80,7 +83,10 @@ export function FileCard({ file, onPinChange }: FileCardProps) {
     setLoading(true);
     try {
       const fullFile = await getInpFile(file.id);
-      setFileContent(fullFile.fileContent || "No content available");
+      const content = fullFile.fileContent || "No content available";
+      setFileContent(content);
+      setOriginalContent(content);
+      setHasChanges(false);
       setShowContent(true);
       await recordFileAccess(file.id);
     } catch (error) {
@@ -92,6 +98,43 @@ export function FileCard({ file, onPinChange }: FileCardProps) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newContent = e.target.value;
+    setFileContent(newContent);
+    setHasChanges(newContent !== originalContent);
+  };
+
+  const handleSaveContent = async () => {
+    setSaving(true);
+    try {
+      await updateInpFileContent(file.id, fileContent);
+      setOriginalContent(fileContent);
+      setHasChanges(false);
+      toast({
+        title: "Saved",
+        description: "File content has been updated",
+      });
+    } catch (error) {
+      toast({
+        title: "Save failed",
+        description: "Failed to save file content",
+        variant: "destructive"
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCloseContent = () => {
+    if (hasChanges) {
+      if (!confirm("You have unsaved changes. Are you sure you want to close?")) {
+        return;
+      }
+    }
+    setShowContent(false);
+    setHasChanges(false);
   };
 
   const handleDelete = async () => {
@@ -310,26 +353,42 @@ export function FileCard({ file, onPinChange }: FileCardProps) {
         </CardContent>
       </Card>
 
-      <Dialog open={showContent} onOpenChange={setShowContent}>
+      <Dialog open={showContent} onOpenChange={(open) => !open && handleCloseContent()}>
         <DialogContent className="max-w-4xl max-h-[80vh]">
           <DialogHeader>
             <div className="flex items-center justify-between">
-              <DialogTitle className="font-mono">{file.filename}</DialogTitle>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleCopyContent}
-                className="gap-2"
-                data-testid="copy-content-button"
-              >
-                {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                {copied ? "Copied" : "Copy"}
-              </Button>
+              <DialogTitle className="font-mono flex items-center gap-2">
+                {file.filename}
+                {hasChanges && <Badge variant="secondary" className="text-xs">Unsaved</Badge>}
+              </DialogTitle>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCopyContent}
+                  className="gap-2"
+                  data-testid="copy-content-button"
+                >
+                  {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  {copied ? "Copied" : "Copy"}
+                </Button>
+                <Button
+                  variant={hasChanges ? "default" : "outline"}
+                  size="sm"
+                  onClick={handleSaveContent}
+                  disabled={!hasChanges || saving}
+                  className="gap-2"
+                  data-testid="save-content-button"
+                >
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  {saving ? "Saving..." : "Save"}
+                </Button>
+              </div>
             </div>
           </DialogHeader>
           <Textarea 
-            value={fileContent} 
-            readOnly 
+            value={fileContent}
+            onChange={handleContentChange}
             className="font-mono text-xs h-[60vh] resize-none"
             data-testid="file-content-textarea"
           />

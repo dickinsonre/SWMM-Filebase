@@ -215,6 +215,17 @@ export class ObjectStorageService {
     return `/objects/inp-files/${objectId}`;
   }
 
+  async updateInpFileContent(objectPath: string, content: string): Promise<void> {
+    const privateObjectDir = this.getPrivateObjectDir();
+    const fullPath = `${privateObjectDir}${objectPath}`;
+    const { bucketName, objectName } = parseObjectPath(fullPath);
+    const bucket = objectStorageClient.bucket(bucketName);
+    const file = bucket.file(objectName);
+    await file.save(content, {
+      contentType: 'text/plain',
+    });
+  }
+
   async getInpFileContent(objectPath: string): Promise<string> {
     let entityDir = this.getPrivateObjectDir();
     if (!entityDir.endsWith("/")) {

@@ -249,3 +249,24 @@ export async function exportDirectory(directory: string): Promise<void> {
   document.body.removeChild(a);
   window.URL.revokeObjectURL(url);
 }
+
+export interface UpdateContentResult {
+  success: boolean;
+  nodeCount: number;
+  linkCount: number;
+  subcatchmentCount: number;
+}
+
+export async function updateInpFileContent(id: string, content: string): Promise<UpdateContentResult> {
+  const response = await fetch(`/api/inp-files/${id}/content`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content }),
+  });
+  
+  if (!response.ok) {
+    throw new Error('Failed to update file content');
+  }
+  
+  return response.json();
+}

@@ -130,6 +130,40 @@ export async function registerRoutes(
     }
   });
 
+  app.put("/api/inp-files/:id/content", async (req, res) => {
+    try {
+      const { content } = req.body;
+      if (typeof content !== 'string') {
+        return res.status(400).json({ error: 'Content is required' });
+      }
+
+      const file = await storage.getInpFile(req.params.id);
+      if (!file) {
+        return res.status(404).json({ error: 'File not found' });
+      }
+
+      await objectStorageService.updateInpFileContent(file.objectPath, content);
+
+      const metadata = parseInpFile(content);
+      const updatedFile = await storage.updateFileMetadata(req.params.id, {
+        nodeCount: metadata.nodeCount,
+        linkCount: metadata.linkCount,
+        subcatchmentCount: metadata.subcatchmentCount,
+        size: Buffer.byteLength(content, 'utf-8')
+      });
+
+      res.json({
+        success: true,
+        nodeCount: updatedFile?.nodeCount,
+        linkCount: updatedFile?.linkCount,
+        subcatchmentCount: updatedFile?.subcatchmentCount
+      });
+    } catch (error) {
+      console.error('Error updating file content:', error);
+      res.status(500).json({ error: 'Failed to update file content' });
+    }
+  });
+
   app.post("/api/inp-files/upload", upload.any(), async (req, res) => {
     try {
       const allFiles = req.files as Express.Multer.File[];
