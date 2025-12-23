@@ -1,25 +1,16 @@
-interface SWMMModule {
-  ccall: (name: string, returnType: string, argTypes: string[], args: unknown[]) => unknown;
-  cwrap: (name: string, returnType: string, argTypes: string[]) => (...args: unknown[]) => unknown;
-  FS: {
-    writeFile: (path: string, data: string | Uint8Array) => void;
+interface SWMMModulePartial {
+  cwrap?: (name: string, returnType: string, argTypes: string[]) => (...args: unknown[]) => unknown;
+  FS_createDataFile?: (parent: string, name: string, data: string | ArrayBufferView, canRead: boolean, canWrite: boolean, canOwn?: boolean) => void;
+  FS_unlink?: (path: string) => void;
+  FS_createPath?: (parent: string, path: string, canRead: boolean, canWrite: boolean) => void;
+  FS?: {
     readFile: (path: string, opts?: { encoding?: string }) => Uint8Array | string;
+    writeFile: (path: string, data: string | Uint8Array) => void;
     unlink: (path: string) => void;
     mkdir: (path: string) => void;
   };
-  allocateUTF8: (str: string) => number;
-  UTF8ToString: (ptr: number) => string;
-  stringToUTF8: (str: string, ptr: number, maxBytes: number) => void;
-  _malloc: (size: number) => number;
-  _free: (ptr: number) => void;
   onRuntimeInitialized?: () => void;
   calledRun?: boolean;
-}
-
-export interface SimulationProgress {
-  elapsedTime: number;
-  progress: number;
-  currentDate: string;
 }
 
 export interface SimulationResult {
@@ -30,22 +21,27 @@ export interface SimulationResult {
   outputContent: Uint8Array | null;
 }
 
-export type ProgressCallback = (progress: SimulationProgress) => void;
-
 declare global {
   interface Window {
-    Module: Partial<SWMMModule> & { onRuntimeInitialized?: () => void };
+    Module: SWMMModulePartial;
+    FS?: {
+      readFile: (path: string, opts?: { encoding?: string }) => Uint8Array | string;
+      writeFile: (path: string, data: string | Uint8Array) => void;
+      unlink: (path: string) => void;
+      mkdir: (path: string) => void;
+    };
+    swmm_run?: (input: string, report: string, output: string) => number;
   }
 }
 
 class SWMMEngine {
-  private module: SWMMModule | null = null;
+  private swmmRunFn: ((input: string, report: string, output: string) => number) | null = null;
   private isLoading = false;
   private loadPromise: Promise<void> | null = null;
   private scriptLoaded = false;
 
   async init(): Promise<void> {
-    if (this.module) return;
+    if (this.swmmRunFn) return;
     if (this.loadPromise) return this.loadPromise;
     
     this.isLoading = true;
@@ -60,15 +56,30 @@ class SWMMEngine {
 
   private loadScript(): Promise<void> {
     return new Promise((resolve, reject) => {
-      if (this.scriptLoaded && window.Module) {
+      if (this.scriptLoaded) {
         resolve();
         return;
       }
       
       const existingScript = document.querySelector('script[src="/swmm/js.js"]');
-      if (existingScript && window.Module && window.Module.ccall) {
-        this.scriptLoaded = true;
-        resolve();
+      if (existingScript) {
+        const checkReady = setInterval(() => {
+          if (this.isModuleReady()) {
+            clearInterval(checkReady);
+            this.scriptLoaded = true;
+            resolve();
+          }
+        }, 100);
+        
+        setTimeout(() => {
+          clearInterval(checkReady);
+          if (!this.scriptLoaded && this.isModuleReady()) {
+            this.scriptLoaded = true;
+            resolve();
+          } else if (!this.scriptLoaded) {
+            reject(new Error('SWMM module load timeout'));
+          }
+        }, 30000);
         return;
       }
 
@@ -77,7 +88,7 @@ class SWMMEngine {
           this.scriptLoaded = true;
           resolve();
         }
-      } as SWMMModule;
+      };
       
       const script = document.createElement('script');
       script.src = '/swmm/js.js';
@@ -86,7 +97,7 @@ class SWMMEngine {
 
       setTimeout(() => {
         if (!this.scriptLoaded) {
-          if (window.Module && window.Module.ccall) {
+          if (this.isModuleReady()) {
             this.scriptLoaded = true;
             resolve();
           } else {
@@ -97,86 +108,103 @@ class SWMMEngine {
     });
   }
 
+  private isModuleReady(): boolean {
+    const m = window.Module;
+    if (!m) return false;
+    
+    const hasCwrap = typeof m.cwrap === 'function';
+    const hasModuleFS = typeof m.FS_createDataFile === 'function' || Boolean(m.FS && typeof m.FS.writeFile === 'function');
+    const hasGlobalFS = Boolean(window.FS && typeof window.FS.readFile === 'function');
+    
+    return hasCwrap && (hasModuleFS || hasGlobalFS);
+  }
+
   private async loadModule(): Promise<void> {
     await this.loadScript();
     
     const m = window.Module;
-    if (!m || !m.ccall || !m.FS || !m.allocateUTF8 || !m._free) {
-      throw new Error('SWMM module not available');
+    if (!m || !m.cwrap) {
+      throw new Error('SWMM module cwrap not available');
     }
     
-    this.module = m as SWMMModule;
+    try {
+      this.swmmRunFn = m.cwrap('swmm_run', 'number', ['string', 'string', 'string']) as (input: string, report: string, output: string) => number;
+    } catch (e) {
+      throw new Error(`Failed to wrap swmm_run: ${e}`);
+    }
     
     try {
-      this.module.FS.mkdir('/work');
+      if (m.FS_createPath) {
+        m.FS_createPath('/', 'work', true, true);
+      } else if (m.FS) {
+        m.FS.mkdir('/work');
+      } else if (window.FS) {
+        window.FS.mkdir('/work');
+      }
     } catch {
       // Directory may already exist
     }
   }
 
   isReady(): boolean {
-    return this.module !== null;
+    return this.swmmRunFn !== null;
   }
 
-  async run(
-    inputContent: string,
-    onProgress?: ProgressCallback
-  ): Promise<SimulationResult> {
+  async run(inputContent: string): Promise<SimulationResult> {
     await this.init();
     
-    if (!this.module) {
+    if (!this.swmmRunFn) {
       throw new Error('SWMM module not initialized');
     }
 
-    const inputPath = '/work/input.inp';
-    const reportPath = '/work/report.rpt';
-    const outputPath = '/work/output.out';
+    const timestamp = Date.now();
+    const inputPath = `/work/input_${timestamp}.inp`;
+    const reportPath = `/work/report_${timestamp}.rpt`;
+    const outputPath = `/work/output_${timestamp}.out`;
 
+    const m = window.Module;
+    
     try {
-      this.module.FS.writeFile(inputPath, inputContent);
-    } catch {
-      try {
-        this.module.FS.mkdir('/work');
-      } catch {}
-      this.module.FS.writeFile(inputPath, inputContent);
+      const filename = `input_${timestamp}.inp`;
+      if (m.FS_createDataFile) {
+        try { if (m.FS_unlink) m.FS_unlink(inputPath); } catch {}
+        m.FS_createDataFile('/work', filename, inputContent, true, true);
+      } else if (m.FS) {
+        m.FS.writeFile(inputPath, inputContent);
+      } else if (window.FS) {
+        window.FS.writeFile(inputPath, inputContent);
+      } else {
+        throw new Error('No file system available');
+      }
+    } catch (e) {
+      throw new Error(`Failed to write input file: ${e}`);
     }
-
-    const inputPtr = this.module.allocateUTF8(inputPath);
-    const reportPtr = this.module.allocateUTF8(reportPath);
-    const outputPtr = this.module.allocateUTF8(outputPath);
 
     let errorCode = 0;
     let reportContent = '';
     let outputContent: Uint8Array | null = null;
 
     try {
-      errorCode = this.module.ccall('swmm_run', 'number', ['number', 'number', 'number'], [inputPtr, reportPtr, outputPtr]) as number;
+      errorCode = this.swmmRunFn(inputPath, reportPath, outputPath);
 
-      if (onProgress) {
-        onProgress({
-          elapsedTime: 100,
-          progress: 1.0,
-          currentDate: new Date().toISOString()
-        });
+      const fs = m.FS || window.FS;
+      if (fs) {
+        try {
+          reportContent = fs.readFile(reportPath, { encoding: 'utf8' }) as string;
+        } catch {
+          reportContent = '';
+        }
+
+        try {
+          outputContent = fs.readFile(outputPath) as Uint8Array;
+        } catch {
+          outputContent = null;
+        }
+
+        try { fs.unlink(inputPath); } catch {}
+        try { fs.unlink(reportPath); } catch {}
+        try { fs.unlink(outputPath); } catch {}
       }
-
-      try {
-        reportContent = this.module.FS.readFile(reportPath, { encoding: 'utf8' }) as string;
-      } catch {
-        reportContent = '';
-      }
-
-      try {
-        outputContent = this.module.FS.readFile(outputPath) as Uint8Array;
-      } catch {
-        outputContent = null;
-      }
-
-      try {
-        this.module.FS.unlink(inputPath);
-        this.module.FS.unlink(reportPath);
-        this.module.FS.unlink(outputPath);
-      } catch {}
 
       return {
         success: errorCode === 0,
@@ -185,10 +213,14 @@ class SWMMEngine {
         reportContent,
         outputContent
       };
-    } finally {
-      this.module._free(inputPtr);
-      this.module._free(reportPtr);
-      this.module._free(outputPtr);
+    } catch (e) {
+      return {
+        success: false,
+        errorCode: -1,
+        errorMessage: `Simulation execution error: ${e}`,
+        reportContent: '',
+        outputContent: null
+      };
     }
   }
 
@@ -204,18 +236,7 @@ class SWMMEngine {
       103: 'No input data',
       111: 'Cannot open input file',
       113: 'Cannot open report file',
-      117: 'Cannot open output file',
-      191: 'Invalid date/time value',
-      193: 'Option keyword undefined',
-      195: 'Invalid option value',
-      200: 'Too many items defined',
-      201: 'Undefined node',
-      203: 'Undefined link',
-      205: 'Undefined time series',
-      207: 'Undefined curve',
-      301: 'Subcatchment outlet is another subcatchment',
-      303: 'Node outlet is the same as its inlet',
-      305: 'Divider outlet link must be part of connected network'
+      117: 'Cannot open output file'
     };
     return errors[code] || `Unknown error (code: ${code})`;
   }
