@@ -1,6 +1,6 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { CoordinateData } from "@/lib/api";
-import { ZoomIn, ZoomOut, RotateCcw, Sun, Moon, Layers, Mountain, Building2, TreePine, Waves } from "lucide-react";
+import { ZoomIn, ZoomOut, RotateCcw, Sun, Moon, Layers, Box } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -10,6 +10,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
+
+interface TooltipData {
+  type: 'node' | 'link' | 'polygon';
+  id: string;
+  x: number;
+  y: number;
+  data?: Record<string, string | number>;
+}
 
 interface MinecraftMapProps {
   coordinates: CoordinateData;
@@ -292,15 +300,85 @@ export function MinecraftMap({ coordinates, width = 800, height = 500 }: Minecra
   const [isNight, setIsNight] = useState(false);
   const [waterFrame, setWaterFrame] = useState(0);
   const [baseLayer, setBaseLayer] = useState<BaseLayer>('minecraft');
+  const [isIsometric, setIsIsometric] = useState(false);
+  const [tooltip, setTooltip] = useState<TooltipData | null>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
   
   const theme = LAYER_THEMES[baseLayer];
 
-  // Animate water
+  // Animate water with faster flow
   useEffect(() => {
     const interval = setInterval(() => {
-      setWaterFrame(f => (f + 1) % 4);
-    }, 400);
+      setWaterFrame(f => (f + 1) % 8);
+    }, 200);
     return () => clearInterval(interval);
+  }, []);
+
+  // Handle mouse move for tooltip positioning
+  const handleMouseMoveTooltip = useCallback((e: React.MouseEvent) => {
+    if (tooltip && svgRef.current) {
+      const rect = svgRef.current.getBoundingClientRect();
+      setTooltip(prev => prev ? {
+        ...prev,
+        x: e.clientX - rect.left + 15,
+        y: e.clientY - rect.top - 10
+      } : null);
+    }
+  }, [tooltip]);
+
+  // Show tooltip for a node
+  const showNodeTooltip = useCallback((e: React.MouseEvent, nodeId: string, index: number) => {
+    if (svgRef.current) {
+      const rect = svgRef.current.getBoundingClientRect();
+      setTooltip({
+        type: 'node',
+        id: nodeId,
+        x: e.clientX - rect.left + 15,
+        y: e.clientY - rect.top - 10,
+        data: {
+          'Type': index % 5 === 0 ? 'Junction' : index % 5 === 1 ? 'Outfall' : index % 5 === 2 ? 'Storage' : 'Node',
+          'Index': index + 1,
+        }
+      });
+    }
+  }, []);
+
+  // Show tooltip for a link
+  const showLinkTooltip = useCallback((e: React.MouseEvent, linkId: string, fromNode: string, toNode: string) => {
+    if (svgRef.current) {
+      const rect = svgRef.current.getBoundingClientRect();
+      setTooltip({
+        type: 'link',
+        id: linkId,
+        x: e.clientX - rect.left + 15,
+        y: e.clientY - rect.top - 10,
+        data: {
+          'From': fromNode,
+          'To': toNode,
+          'Type': 'Conduit',
+        }
+      });
+    }
+  }, []);
+
+  // Show tooltip for a polygon (subcatchment)
+  const showPolygonTooltip = useCallback((e: React.MouseEvent, polygonId: string) => {
+    if (svgRef.current) {
+      const rect = svgRef.current.getBoundingClientRect();
+      setTooltip({
+        type: 'polygon',
+        id: polygonId,
+        x: e.clientX - rect.left + 15,
+        y: e.clientY - rect.top - 10,
+        data: {
+          'Type': 'Subcatchment',
+        }
+      });
+    }
+  }, []);
+
+  const hideTooltip = useCallback(() => {
+    setTooltip(null);
   }, []);
 
   const { bounds, nodeMap, transform, decorations, trees, flowers, torches } = useMemo(() => {
@@ -428,7 +506,7 @@ export function MinecraftMap({ coordinates, width = 800, height = 500 }: Minecra
     return theme.nodeColors[index % theme.nodeColors.length];
   };
 
-  const renderBlockyLine = (x1: number, y1: number, x2: number, y2: number, key: string, title: string, linkIndex: number) => {
+  const renderBlockyLine = (x1: number, y1: number, x2: number, y2: number, key: string, link: { id: string; fromNode: string; toNode: string }, linkIndex: number) => {
     const blocks: { x: number; y: number }[] = [];
     
     const startX = snapToGrid(x1);
@@ -456,10 +534,25 @@ export function MinecraftMap({ coordinates, width = 800, height = 500 }: Minecra
       index === self.findIndex(b => b.x === block.x && b.y === block.y)
     );
 
+    // Calculate flow direction for animation
+    const flowDirection = Math.atan2(dy, dx);
+    const numBlocks = uniqueBlocks.length;
+
     return (
-      <g key={key} data-testid={key}>
+      <g 
+        key={key} 
+        data-testid={key}
+        style={{ cursor: 'pointer' }}
+        onMouseEnter={(e) => showLinkTooltip(e, link.id, link.fromNode, link.toNode)}
+        onMouseMove={handleMouseMoveTooltip}
+        onMouseLeave={hideTooltip}
+      >
         {uniqueBlocks.map((block, idx) => {
-          const isFlowing = (idx + waterFrame + linkIndex) % 4 === 0;
+          // Enhanced water flow animation - flowing wave pattern
+          const flowPhase = (idx / numBlocks + waterFrame / 8) % 1;
+          const isFlowing = flowPhase > 0.3 && flowPhase < 0.6;
+          const isPulse = flowPhase > 0.4 && flowPhase < 0.5;
+          
           return (
             <g key={idx}>
               <rect
@@ -476,21 +569,39 @@ export function MinecraftMap({ coordinates, width = 800, height = 500 }: Minecra
                 height={BLOCK_SIZE - 2}
                 fill={theme.pipeColor}
               />
-              {/* Animated water flow inside pipe */}
+              {/* Animated water flow inside pipe - pulsing wave */}
               {isFlowing && (
                 <rect
                   x={block.x - 2}
                   y={block.y - 2}
                   width={4}
                   height={4}
+                  fill={isPulse ? theme.waterLight : theme.water}
+                  opacity={isPulse ? 1 : 0.7}
+                >
+                  <animate 
+                    attributeName="opacity" 
+                    values="0.5;1;0.5" 
+                    dur="0.4s" 
+                    repeatCount="indefinite" 
+                  />
+                </rect>
+              )}
+              {/* Secondary flow particles */}
+              {((idx + waterFrame) % 3 === 0) && (
+                <rect
+                  x={block.x - 1}
+                  y={block.y - 1}
+                  width={2}
+                  height={2}
                   fill={theme.waterLight}
-                  opacity={0.8}
+                  opacity={0.6}
                 />
               )}
             </g>
           );
         })}
-        <title>{title}</title>
+        <title>{link.id}</title>
       </g>
     );
   };
@@ -601,6 +712,16 @@ export function MinecraftMap({ coordinates, width = 800, height = 500 }: Minecra
           </DropdownMenuContent>
         </DropdownMenu>
         <Button 
+          variant={isIsometric ? "default" : "outline"} 
+          size="icon" 
+          onClick={() => setIsIsometric(!isIsometric)} 
+          className="h-8 w-8" 
+          data-testid="mc-map-isometric"
+          title={isIsometric ? "Switch to Flat View" : "Switch to Isometric 2.5D View"}
+        >
+          <Box className="h-4 w-4" />
+        </Button>
+        <Button 
           variant="outline" 
           size="icon" 
           onClick={() => setIsNight(!isNight)} 
@@ -622,18 +743,22 @@ export function MinecraftMap({ coordinates, width = 800, height = 500 }: Minecra
       </div>
 
       <svg
+        ref={svgRef}
         width={width}
         height={height}
         className="rounded-lg cursor-grab active:cursor-grabbing"
         style={{ 
           imageRendering: "pixelated",
           border: `4px solid ${theme.borderColor}`,
-          boxShadow: isNight ? '0 0 20px rgba(255, 171, 64, 0.3)' : 'none'
+          boxShadow: isNight ? '0 0 20px rgba(255, 171, 64, 0.3)' : 'none',
+          transform: isIsometric ? 'perspective(800px) rotateX(45deg) rotateZ(-10deg) scale(0.85)' : 'none',
+          transformOrigin: 'center center',
+          transition: 'transform 0.3s ease-in-out'
         }}
         onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
+        onMouseMove={(e) => { handleMouseMove(e); handleMouseMoveTooltip(e); }}
         onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
+        onMouseLeave={() => { handleMouseUp(); hideTooltip(); }}
         data-testid="minecraft-map-svg"
       >
         <defs>
@@ -726,7 +851,14 @@ export function MinecraftMap({ coordinates, width = 800, height = 500 }: Minecra
               .map(p => `${snapToGrid(p.x)},${snapToGrid(p.y)}`)
               .join(' ');
             return (
-              <g key={`mc-polygon-${polygon.id}`} data-testid={`mc-polygon-${polygon.id}`}>
+              <g 
+                key={`mc-polygon-${polygon.id}`} 
+                data-testid={`mc-polygon-${polygon.id}`}
+                style={{ cursor: 'pointer' }}
+                onMouseEnter={(e) => showPolygonTooltip(e, polygon.id)}
+                onMouseMove={handleMouseMoveTooltip}
+                onMouseLeave={hideTooltip}
+              >
                 <polygon
                   points={points}
                   fill="url(#water-pattern)"
@@ -760,7 +892,7 @@ export function MinecraftMap({ coordinates, width = 800, height = 500 }: Minecra
             const from = transform(fromNode.x, fromNode.y);
             const to = transform(toNode.x, toNode.y);
 
-            return renderBlockyLine(from.x, from.y, to.x, to.y, `mc-link-${link.id}`, link.id, index);
+            return renderBlockyLine(from.x, from.y, to.x, to.y, `mc-link-${link.id}`, link, index);
           })}
 
           {/* Nodes as different ore blocks */}
@@ -772,7 +904,14 @@ export function MinecraftMap({ coordinates, width = 800, height = 500 }: Minecra
             const colors = getNodeColors(index);
             
             return (
-              <g key={`mc-node-${node.id}`} data-testid={`mc-node-${node.id}`}>
+              <g 
+                key={`mc-node-${node.id}`} 
+                data-testid={`mc-node-${node.id}`}
+                style={{ cursor: 'pointer' }}
+                onMouseEnter={(e) => showNodeTooltip(e, node.id, index)}
+                onMouseMove={handleMouseMoveTooltip}
+                onMouseLeave={hideTooltip}
+              >
                 {/* Stone base */}
                 <rect
                   x={blockX - nodeSize / 2 - 2}
@@ -880,6 +1019,84 @@ export function MinecraftMap({ coordinates, width = 800, height = 500 }: Minecra
           <span className="ml-1">Node Types</span>
         </div>
       </div>
+
+      {/* Minecraft-style tooltip */}
+      {tooltip && (
+        <div
+          className="absolute pointer-events-none z-50"
+          style={{
+            left: Math.min(tooltip.x, width - 180),
+            top: Math.max(tooltip.y, 10),
+            fontFamily: "'Courier New', monospace",
+            fontSize: '11px',
+            background: 'linear-gradient(180deg, #c6c6c6 0%, #8b8b8b 100%)',
+            border: '3px solid #373737',
+            borderTopColor: '#fff',
+            borderLeftColor: '#fff',
+            padding: '8px 12px',
+            boxShadow: '4px 4px 0 rgba(0,0,0,0.3)',
+            imageRendering: 'pixelated',
+            minWidth: '140px',
+          }}
+          data-testid="mc-tooltip"
+        >
+          <div 
+            style={{ 
+              fontWeight: 'bold', 
+              marginBottom: '6px',
+              color: tooltip.type === 'node' ? theme.nodeColors[0].main : 
+                     tooltip.type === 'link' ? theme.pipeColor : theme.water,
+              textShadow: '1px 1px 0 rgba(0,0,0,0.3)'
+            }}
+          >
+            {tooltip.type === 'node' && '◆ '}
+            {tooltip.type === 'link' && '━ '}
+            {tooltip.type === 'polygon' && '≈ '}
+            {tooltip.id}
+          </div>
+          {tooltip.data && Object.entries(tooltip.data).map(([key, value]) => (
+            <div 
+              key={key} 
+              style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between',
+                gap: '12px',
+                marginTop: '2px',
+                color: '#2d2d2d'
+              }}
+            >
+              <span style={{ color: '#555' }}>{key}:</span>
+              <span style={{ fontWeight: 'bold' }}>{value}</span>
+            </div>
+          ))}
+          <div 
+            style={{ 
+              marginTop: '6px', 
+              paddingTop: '4px', 
+              borderTop: '1px solid rgba(0,0,0,0.2)',
+              color: '#666',
+              fontSize: '9px'
+            }}
+          >
+            {tooltip.type === 'node' ? 'Junction Node' : 
+             tooltip.type === 'link' ? 'Conduit Pipe' : 'Subcatchment Area'}
+          </div>
+        </div>
+      )}
+
+      {/* Isometric mode indicator */}
+      {isIsometric && (
+        <div 
+          className="absolute top-12 left-2 text-[10px] text-white/90 px-2 py-1 rounded"
+          style={{ 
+            fontFamily: "'Courier New', monospace",
+            background: 'rgba(0,0,0,0.7)',
+            border: '1px solid rgba(255,255,255,0.3)'
+          }}
+        >
+          📐 ISOMETRIC 2.5D
+        </div>
+      )}
     </div>
   );
 }
