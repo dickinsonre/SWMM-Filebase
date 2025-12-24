@@ -403,9 +403,11 @@ export function FileCard({ file, onPinChange }: FileCardProps) {
               <span className="truncate">Map: {file.filename}</span>
             </DialogTitle>
           </DialogHeader>
-          <div className="flex-1 min-h-0">
+          <div className="flex-1 min-h-0 w-full overflow-hidden">
             {coordinates && coordinates.nodes.length > 0 ? (
-              <MapVisualization coordinates={coordinates} width={900} height={500} />
+              <div className="w-full h-full min-h-[300px]">
+                <MapVisualization coordinates={coordinates} />
+              </div>
             ) : (
               <div className="h-full flex items-center justify-center bg-muted/30 rounded-lg border border-border">
                 <div className="text-center text-muted-foreground">
@@ -432,9 +434,11 @@ export function FileCard({ file, onPinChange }: FileCardProps) {
               <span className="truncate">Minecraft: {file.filename}</span>
             </DialogTitle>
           </DialogHeader>
-          <div className="flex-1 min-h-0">
+          <div className="flex-1 min-h-0 w-full overflow-hidden">
             {coordinates && coordinates.nodes.length > 0 ? (
-              <MinecraftMap coordinates={coordinates} width={900} height={500} />
+              <div className="w-full h-full min-h-[300px]">
+                <MinecraftMap coordinates={coordinates} />
+              </div>
             ) : (
               <div className="h-full flex items-center justify-center bg-muted/30 rounded-lg border border-border">
                 <div className="text-center text-muted-foreground">

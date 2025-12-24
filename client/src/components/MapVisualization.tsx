@@ -1,15 +1,48 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef, useEffect } from "react";
 import { CoordinateData } from "@/lib/api";
 import { ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface MapVisualizationProps {
   coordinates: CoordinateData;
-  width?: number;
-  height?: number;
 }
 
-export function MapVisualization({ coordinates, width = 800, height = 500 }: MapVisualizationProps) {
+// Hook to get container dimensions
+function useContainerSize(ref: React.RefObject<HTMLDivElement | null>) {
+  const [size, setSize] = useState({ width: 800, height: 500 });
+  
+  useEffect(() => {
+    const updateSize = () => {
+      if (ref.current) {
+        const rect = ref.current.getBoundingClientRect();
+        setSize({ 
+          width: Math.max(rect.width, 300), 
+          height: Math.max(rect.height, 200) 
+        });
+      }
+    };
+    
+    updateSize();
+    window.addEventListener('resize', updateSize);
+    
+    const resizeObserver = new ResizeObserver(updateSize);
+    if (ref.current) {
+      resizeObserver.observe(ref.current);
+    }
+    
+    return () => {
+      window.removeEventListener('resize', updateSize);
+      resizeObserver.disconnect();
+    };
+  }, [ref]);
+  
+  return size;
+}
+
+export function MapVisualization({ coordinates }: MapVisualizationProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const { width, height } = useContainerSize(containerRef);
+  
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -94,14 +127,14 @@ export function MapVisualization({ coordinates, width = 800, height = 500 }: Map
 
   if (!bounds || !transform) {
     return (
-      <div className="h-full flex items-center justify-center text-muted-foreground">
+      <div ref={containerRef} className="h-full w-full flex items-center justify-center text-muted-foreground">
         <p>No coordinate data available in this file</p>
       </div>
     );
   }
 
   return (
-    <div className="relative h-full">
+    <div ref={containerRef} className="relative h-full w-full">
       <div className="absolute top-2 right-2 z-10 flex gap-1">
         <Button variant="outline" size="icon" onClick={handleZoomIn} className="h-8 w-8" data-testid="map-zoom-in">
           <ZoomIn className="h-4 w-4" />

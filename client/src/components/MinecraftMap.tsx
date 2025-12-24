@@ -21,8 +21,39 @@ interface TooltipData {
 
 interface MinecraftMapProps {
   coordinates: CoordinateData;
-  width?: number;
-  height?: number;
+}
+
+// Hook to get container dimensions
+function useContainerSize(ref: React.RefObject<HTMLDivElement | null>) {
+  const [size, setSize] = useState({ width: 800, height: 500 });
+  
+  useEffect(() => {
+    const updateSize = () => {
+      if (ref.current) {
+        const rect = ref.current.getBoundingClientRect();
+        setSize({ 
+          width: Math.max(rect.width, 300), 
+          height: Math.max(rect.height, 200) 
+        });
+      }
+    };
+    
+    updateSize();
+    window.addEventListener('resize', updateSize);
+    
+    // Use ResizeObserver for more accurate container size tracking
+    const resizeObserver = new ResizeObserver(updateSize);
+    if (ref.current) {
+      resizeObserver.observe(ref.current);
+    }
+    
+    return () => {
+      window.removeEventListener('resize', updateSize);
+      resizeObserver.disconnect();
+    };
+  }, [ref]);
+  
+  return size;
 }
 
 type BaseLayer = 'minecraft' | 'satellite' | 'street' | 'terrain' | 'ocean' | 'desert' | 'snow';
@@ -292,7 +323,10 @@ function seededRandom(seed: number) {
   return x - Math.floor(x);
 }
 
-export function MinecraftMap({ coordinates, width = 800, height = 500 }: MinecraftMapProps) {
+export function MinecraftMap({ coordinates }: MinecraftMapProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const { width, height } = useContainerSize(containerRef);
+  
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -668,7 +702,7 @@ export function MinecraftMap({ coordinates, width = 800, height = 500 }: Minecra
 
   if (!bounds || !transform) {
     return (
-      <div className="h-full flex items-center justify-center text-muted-foreground">
+      <div ref={containerRef} className="h-full w-full flex items-center justify-center text-muted-foreground">
         <p>No coordinate data available in this file</p>
       </div>
     );
@@ -686,8 +720,8 @@ export function MinecraftMap({ coordinates, width = 800, height = 500 }: Minecra
   }));
 
   return (
-    <div className="relative h-full">
-      <div className="absolute top-2 right-2 z-10 flex gap-1">
+    <div ref={containerRef} className="relative h-full w-full">
+      <div className="absolute top-2 right-2 z-10 flex gap-1 flex-wrap">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="icon" className="h-8 w-8" data-testid="mc-map-layers" title="Change Base Layer">
