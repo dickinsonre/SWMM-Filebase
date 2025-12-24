@@ -227,7 +227,7 @@ export function SidebarContent({ onNavigate }: SidebarContentProps) {
            <div className="w-8 h-8 rounded bg-primary flex items-center justify-center text-primary-foreground">
              <BrainCircuit className="h-5 w-5" />
            </div>
-           SWMM<span className="text-primary font-mono">Mgr</span>
+           SWMM 5 <span className="text-primary font-mono">Miner</span>
         </h1>
       </div>
 
@@ -534,7 +534,7 @@ export function MobileHeader() {
             <BrainCircuit className="h-5 w-5" />
           </div>
           <span className="font-bold text-lg tracking-tight">
-            SWMM<span className="text-primary font-mono">Mgr</span>
+            SWMM 5 <span className="text-primary font-mono">Miner</span>
           </span>
         </div>
         

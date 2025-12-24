@@ -1,8 +1,8 @@
-# SWMM5 Manager
+# SWMM 5 Miner
 
 ## Overview
 
-SWMM5 Manager is a web application for managing, analyzing, and organizing SWMM5 (Storm Water Management Model) `.inp` files. The application allows users to upload, view, and organize stormwater modeling files with AI-powered analysis capabilities. It parses `.inp` files to extract metadata like node counts, link counts, and subcatchment counts, storing both the metadata and file content in a PostgreSQL database.
+SWMM 5 Miner is a web application for mining, analyzing, and visualizing SWMM5 (Storm Water Management Model) `.inp` files with Minecraft-style map visualizations. The application allows users to upload, view, and organize stormwater modeling files with AI-powered analysis capabilities. It parses `.inp` files to extract metadata like node counts, link counts, and subcatchment counts, storing both the metadata and file content in a PostgreSQL database.
 
 ## User Preferences
 
