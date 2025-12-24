@@ -354,10 +354,10 @@ export function FileCard({ file, onPinChange }: FileCardProps) {
       </Card>
 
       <Dialog open={showContent} onOpenChange={(open) => !open && handleCloseContent()}>
-        <DialogContent className="max-w-4xl max-h-[80vh]">
+        <DialogContent className="w-[95vw] max-w-4xl h-[90vh] sm:h-auto sm:max-h-[80vh] flex flex-col">
           <DialogHeader>
-            <div className="flex items-center justify-between">
-              <DialogTitle className="font-mono flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <DialogTitle className="font-mono flex items-center gap-2 text-sm sm:text-base truncate">
                 {file.filename}
                 {hasChanges && <Badge variant="secondary" className="text-xs">Unsaved</Badge>}
               </DialogTitle>
@@ -366,7 +366,7 @@ export function FileCard({ file, onPinChange }: FileCardProps) {
                   variant="outline"
                   size="sm"
                   onClick={handleCopyContent}
-                  className="gap-2"
+                  className="gap-2 h-11 min-w-[44px]"
                   data-testid="copy-content-button"
                 >
                   {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
@@ -377,11 +377,11 @@ export function FileCard({ file, onPinChange }: FileCardProps) {
                   size="sm"
                   onClick={handleSaveContent}
                   disabled={!hasChanges || saving}
-                  className="gap-2"
+                  className="gap-2 h-11 min-w-[44px]"
                   data-testid="save-content-button"
                 >
                   {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                  {saving ? "Saving..." : "Save"}
+                  {saving ? "Saving" : "Save"}
                 </Button>
               </div>
             </div>
@@ -389,21 +389,21 @@ export function FileCard({ file, onPinChange }: FileCardProps) {
           <Textarea 
             value={fileContent}
             onChange={handleContentChange}
-            className="font-mono text-xs h-[60vh] resize-none"
+            className="font-mono text-xs flex-1 min-h-0 resize-none"
             data-testid="file-content-textarea"
           />
         </DialogContent>
       </Dialog>
 
       <Dialog open={showMap} onOpenChange={setShowMap}>
-        <DialogContent className="max-w-5xl max-h-[85vh]">
+        <DialogContent className="w-[95vw] max-w-5xl h-[90vh] sm:h-auto sm:max-h-[85vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle className="font-mono flex items-center gap-2">
-              <Map className="h-5 w-5" />
-              Model Map: {file.filename}
+            <DialogTitle className="font-mono flex items-center gap-2 text-sm sm:text-base">
+              <Map className="h-4 w-4 sm:h-5 sm:w-5" />
+              <span className="truncate">Map: {file.filename}</span>
             </DialogTitle>
           </DialogHeader>
-          <div className="h-[65vh]">
+          <div className="flex-1 min-h-0">
             {coordinates && coordinates.nodes.length > 0 ? (
               <MapVisualization coordinates={coordinates} width={900} height={500} />
             ) : (
@@ -425,14 +425,14 @@ export function FileCard({ file, onPinChange }: FileCardProps) {
       </Dialog>
 
       <Dialog open={showMinecraftMap} onOpenChange={setShowMinecraftMap}>
-        <DialogContent className="max-w-5xl max-h-[85vh]">
+        <DialogContent className="w-[95vw] max-w-5xl h-[90vh] sm:h-auto sm:max-h-[85vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle className="font-mono flex items-center gap-2">
-              <Map className="h-5 w-5" />
-              Minecraft Map: {file.filename}
+            <DialogTitle className="font-mono flex items-center gap-2 text-sm sm:text-base">
+              <Map className="h-4 w-4 sm:h-5 sm:w-5" />
+              <span className="truncate">Minecraft: {file.filename}</span>
             </DialogTitle>
           </DialogHeader>
-          <div className="h-[65vh]">
+          <div className="flex-1 min-h-0">
             {coordinates && coordinates.nodes.length > 0 ? (
               <MinecraftMap coordinates={coordinates} width={900} height={500} />
             ) : (
@@ -471,12 +471,12 @@ export function FileCard({ file, onPinChange }: FileCardProps) {
       </AlertDialog>
 
       <Dialog open={showReport} onOpenChange={setShowReport}>
-        <DialogContent className="max-w-4xl max-h-[80vh]">
+        <DialogContent className="w-[95vw] max-w-4xl h-[90vh] sm:h-auto sm:max-h-[80vh] flex flex-col">
           <DialogHeader>
-            <div className="flex items-center justify-between">
-              <DialogTitle className="font-mono flex items-center gap-2">
-                <FileOutput className="h-5 w-5" />
-                Simulation Report: {file.filename}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <DialogTitle className="font-mono flex items-center gap-2 text-sm sm:text-base">
+                <FileOutput className="h-4 w-4 sm:h-5 sm:w-5" />
+                <span className="truncate">Report: {file.filename}</span>
               </DialogTitle>
               <div className="flex items-center gap-2">
                 <Button
@@ -489,17 +489,17 @@ export function FileCard({ file, onPinChange }: FileCardProps) {
                       description: "Report content copied to clipboard",
                     });
                   }}
-                  className="gap-2 bg-primary/10 hover:bg-primary/20 text-primary border-0"
+                  className="gap-2 bg-primary/10 hover:bg-primary/20 text-primary border-0 h-11 min-w-[44px]"
                   data-testid="copy-report-button"
                 >
                   <Copy className="h-4 w-4" />
-                  Copy Report
+                  Copy
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setShowReport(false)}
-                  className="gap-2"
+                  className="gap-2 h-11 min-w-[44px]"
                   data-testid="close-report-button"
                 >
                   <X className="h-4 w-4" />
@@ -511,7 +511,7 @@ export function FileCard({ file, onPinChange }: FileCardProps) {
           <Textarea 
             value={reportContent} 
             readOnly 
-            className="font-mono text-xs h-[60vh] resize-none"
+            className="font-mono text-xs flex-1 min-h-0 resize-none"
             data-testid="report-content-textarea"
           />
         </DialogContent>

@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, BrainCircuit, Settings, FolderOpen, UploadCloud, Search, FolderInput, ChevronDown, ChevronRight, Trash2, GitCompare, Loader2, Check } from "lucide-react";
+import { LayoutDashboard, BrainCircuit, Settings, FolderOpen, UploadCloud, Search, FolderInput, ChevronDown, ChevronRight, Trash2, GitCompare, Loader2, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,13 @@ import { useFiles } from "@/context/FileContext";
 import { useRef, useState } from "react";
 import { toast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
+import { useIsMobile } from "@/hooks/use-mobile";
+import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,7 +36,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-export function Sidebar() {
+interface SidebarContentProps {
+  onNavigate?: () => void;
+}
+
+export function SidebarContent({ onNavigate }: SidebarContentProps) {
   const [location] = useLocation();
   const { files, uploadFiles, removeDirectory } = useFiles();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -106,10 +117,8 @@ export function Sidebar() {
   };
 
   const handleDirectoryImport = (e: React.ChangeEvent<HTMLInputElement>) => {
-    console.log("handleDirectoryImport called", e.target.files?.length);
     if (e.target.files && e.target.files.length > 0) {
       const inpFiles = Array.from(e.target.files).filter(f => f.name.toLowerCase().endsWith('.inp'));
-      console.log("Found .inp files:", inpFiles.length);
       
       if (inpFiles.length === 0) {
         toast({
@@ -207,8 +216,12 @@ export function Sidebar() {
     e.target.value = '';
   };
 
+  const handleNavClick = () => {
+    if (onNavigate) onNavigate();
+  };
+
   return (
-    <div className="w-64 border-r border-border bg-sidebar text-sidebar-foreground flex flex-col h-screen fixed left-0 top-0">
+    <div className="flex flex-col h-full bg-sidebar text-sidebar-foreground">
       <div className="p-6 border-b border-sidebar-border/40">
         <h1 className="font-bold text-xl tracking-tight flex items-center gap-2">
            <div className="w-8 h-8 rounded bg-primary flex items-center justify-center text-primary-foreground">
@@ -218,11 +231,11 @@ export function Sidebar() {
         </h1>
       </div>
 
-      <div className="p-4">
+      <div className="p-4 flex-1 overflow-auto">
         <div className="space-y-2 mb-6">
           <div className="grid grid-cols-2 gap-2">
             <Button 
-              className="w-full bg-primary text-primary-foreground hover:bg-primary/90 shadow-md text-xs gap-2 px-2"
+              className="w-full bg-primary text-primary-foreground hover:bg-primary/90 shadow-md text-xs gap-2 px-2 min-h-[44px]"
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
               data-testid="upload-file-button"
@@ -235,7 +248,7 @@ export function Sidebar() {
               File
             </Button>
             <Button 
-              className="w-full bg-sidebar-accent text-sidebar-accent-foreground hover:bg-sidebar-accent/80 shadow-sm border border-sidebar-border text-xs gap-2 px-2"
+              className="w-full bg-sidebar-accent text-sidebar-accent-foreground hover:bg-sidebar-accent/80 shadow-sm border border-sidebar-border text-xs gap-2 px-2 min-h-[44px]"
               onClick={() => dirInputRef.current?.click()}
               disabled={uploading}
               data-testid="upload-folder-button"
@@ -288,7 +301,6 @@ export function Sidebar() {
           </AnimatePresence>
         </div>
 
-        {/* Hidden Inputs */}
         <input 
           type="file" 
           ref={fileInputRef} 
@@ -312,9 +324,9 @@ export function Sidebar() {
           {navItems.map((item) => {
             const isActive = location === item.href;
             return (
-              <Link key={item.href} href={item.href}>
+              <Link key={item.href} href={item.href} onClick={handleNavClick}>
                 <span className={cn(
-                  "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer",
+                  "flex items-center gap-3 px-3 py-3 rounded-md text-sm font-medium transition-colors cursor-pointer min-h-[44px]",
                   isActive 
                     ? "bg-sidebar-accent text-sidebar-accent-foreground" 
                     : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
@@ -330,7 +342,7 @@ export function Sidebar() {
         <div className="mb-4 px-3">
           <button 
             onClick={() => setDirectoriesCollapsed(!directoriesCollapsed)}
-            className="flex items-center justify-between w-full text-xs font-semibold text-sidebar-foreground/50 uppercase tracking-wider mb-3 hover:text-sidebar-foreground/70 transition-colors"
+            className="flex items-center justify-between w-full text-xs font-semibold text-sidebar-foreground/50 uppercase tracking-wider mb-3 hover:text-sidebar-foreground/70 transition-colors min-h-[44px]"
             data-testid="toggle-directories"
           >
             <div className="flex items-center gap-2">
@@ -350,21 +362,21 @@ export function Sidebar() {
                <Search className="absolute left-2 top-2.5 h-3 w-3 text-sidebar-foreground/40" />
                <Input 
                  placeholder="Filter..." 
-                 className="h-8 pl-7 text-xs bg-sidebar-accent/30 border-sidebar-border/50 text-sidebar-foreground placeholder:text-sidebar-foreground/30 focus-visible:ring-sidebar-ring"
+                 className="h-10 pl-7 text-xs bg-sidebar-accent/30 border-sidebar-border/50 text-sidebar-foreground placeholder:text-sidebar-foreground/30 focus-visible:ring-sidebar-ring"
                />
             </div>
           )}
         </div>
 
         {!directoriesCollapsed && (
-          <ScrollArea className="h-[300px] px-3">
+          <ScrollArea className="h-[200px] md:h-[300px] px-3">
             <div className="space-y-1">
               {uniqueDirectories.map((dir, i) => (
                 <div key={i} className="flex items-center group">
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="flex-1 justify-start text-xs font-normal text-sidebar-foreground/70 h-auto py-1.5 px-2 hover:bg-sidebar-accent/30 hover:text-sidebar-accent-foreground truncate"
+                    className="flex-1 justify-start text-xs font-normal text-sidebar-foreground/70 h-auto py-2.5 px-2 hover:bg-sidebar-accent/30 hover:text-sidebar-accent-foreground truncate min-h-[44px]"
                     data-testid={`directory-${i}`}
                   >
                     <div className="flex items-center flex-1 min-w-0">
@@ -380,10 +392,10 @@ export function Sidebar() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10"
+                        className="h-10 w-10 p-0 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10"
                         data-testid={`delete-directory-${i}`}
                       >
-                        <Trash2 className="h-3 w-3" />
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </AlertDialogTrigger>
                     <AlertDialogContent>
@@ -430,7 +442,7 @@ export function Sidebar() {
           href="https://github.com/SWMMEnablement/1729-SWMM5-Models" 
           target="_blank" 
           rel="noopener noreferrer"
-          className="flex items-center gap-2 px-3 py-2 mb-3 rounded-md text-xs text-sidebar-foreground/70 hover:bg-sidebar-accent/30 hover:text-sidebar-accent-foreground transition-colors"
+          className="flex items-center gap-2 px-3 py-2 mb-3 rounded-md text-xs text-sidebar-foreground/70 hover:bg-sidebar-accent/30 hover:text-sidebar-accent-foreground transition-colors min-h-[44px]"
         >
           <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
             <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
@@ -473,7 +485,7 @@ export function Sidebar() {
               {pendingFiles.map((file, idx) => (
                 <div 
                   key={idx} 
-                  className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-muted/50 cursor-pointer"
+                  className="flex items-center gap-2 py-2.5 px-2 rounded hover:bg-muted/50 cursor-pointer min-h-[44px]"
                   onClick={() => toggleFileSelection(file.name)}
                 >
                   <Checkbox 
@@ -490,15 +502,54 @@ export function Sidebar() {
           </ScrollArea>
           
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={() => setShowFileSelector(false)}>
+            <Button variant="outline" onClick={() => setShowFileSelector(false)} className="min-h-[44px]">
               Cancel
             </Button>
-            <Button onClick={handleConfirmImport} disabled={selectedFiles.size === 0}>
+            <Button onClick={handleConfirmImport} disabled={selectedFiles.size === 0} className="min-h-[44px]">
               Import {selectedFiles.size} File{selectedFiles.size !== 1 ? 's' : ''}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+export function Sidebar() {
+  return (
+    <div className="w-64 border-r border-border h-screen fixed left-0 top-0 hidden md:block">
+      <SidebarContent />
+    </div>
+  );
+}
+
+export function MobileHeader() {
+  const [open, setOpen] = useState(false);
+  
+  return (
+    <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-background border-b border-border">
+      <div className="flex items-center justify-between px-4 py-3">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded bg-primary flex items-center justify-center text-primary-foreground">
+            <BrainCircuit className="h-5 w-5" />
+          </div>
+          <span className="font-bold text-lg tracking-tight">
+            SWMM<span className="text-primary font-mono">Mgr</span>
+          </span>
+        </div>
+        
+        <Sheet open={open} onOpenChange={setOpen}>
+          <SheetTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-10 w-10" data-testid="mobile-menu-button">
+              <Menu className="h-6 w-6" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="left" className="p-0 w-[280px]">
+            <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
+            <SidebarContent onNavigate={() => setOpen(false)} />
+          </SheetContent>
+        </Sheet>
+      </div>
     </div>
   );
 }

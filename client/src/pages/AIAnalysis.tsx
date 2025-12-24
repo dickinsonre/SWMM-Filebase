@@ -1,4 +1,4 @@
-import { Sidebar } from "@/components/Sidebar";
+import { Sidebar, MobileHeader } from "@/components/Sidebar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -31,9 +31,10 @@ export default function AIAnalysis() {
   };
 
   return (
-    <div className="flex min-h-screen bg-background text-foreground font-sans">
+    <div className="min-h-screen bg-background text-foreground font-sans">
+      <MobileHeader />
       <Sidebar />
-      <main className="flex-1 ml-64 p-8 h-screen flex flex-col">
+      <main className="md:ml-64 p-4 md:p-8 pt-20 md:pt-8 min-h-screen flex flex-col">
         <div className="mb-8">
            <h1 className="text-3xl font-bold tracking-tight mb-2">AI Model Inspector</h1>
            <p className="text-muted-foreground">Use our AI engine to audit your .INP files for common errors, stability issues, and optimization opportunities.</p>

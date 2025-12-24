@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Sidebar } from "@/components/Sidebar";
+import { Sidebar, MobileHeader } from "@/components/Sidebar";
 import { FileCard } from "@/components/FileCard";
 import { useFiles } from "@/context/FileContext";
 import { InpFile, QuickAccessFile, ContentSearchResult, searchFileContent, getPinnedFiles, getRecentFiles, exportDirectory } from "@/lib/api";
@@ -101,9 +101,10 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen bg-background text-foreground font-sans">
+      <div className="min-h-screen bg-background text-foreground font-sans">
+        <MobileHeader />
         <Sidebar />
-        <main className="flex-1 ml-64 p-8 flex items-center justify-center">
+        <main className="md:ml-64 p-4 md:p-8 pt-20 md:pt-8 flex items-center justify-center min-h-screen">
           <div className="flex flex-col items-center gap-4">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <p className="text-muted-foreground">Loading your models...</p>
@@ -115,9 +116,10 @@ export default function Dashboard() {
 
   if (error) {
     return (
-      <div className="flex min-h-screen bg-background text-foreground font-sans">
+      <div className="min-h-screen bg-background text-foreground font-sans">
+        <MobileHeader />
         <Sidebar />
-        <main className="flex-1 ml-64 p-8 flex items-center justify-center">
+        <main className="md:ml-64 p-4 md:p-8 pt-20 md:pt-8 flex items-center justify-center min-h-screen">
           <div className="text-center">
             <p className="text-destructive mb-2">Error loading files</p>
             <p className="text-muted-foreground text-sm">{error}</p>
@@ -128,23 +130,24 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="flex min-h-screen bg-background text-foreground font-sans">
+    <div className="min-h-screen bg-background text-foreground font-sans">
+      <MobileHeader />
       <Sidebar />
-      <main className="flex-1 ml-64 p-8 overflow-y-auto">
+      <main className="md:ml-64 p-4 md:p-8 pt-20 md:pt-8 overflow-y-auto">
         
         {/* Header Section */}
         <div className="flex flex-col gap-6 mb-8">
-          <div className="relative h-48 rounded-xl overflow-hidden border border-border/40 shadow-sm group">
+          <div className="relative h-32 sm:h-48 rounded-xl overflow-hidden border border-border/40 shadow-sm group">
             <div className="absolute inset-0 bg-gradient-to-r from-primary/90 to-blue-900/90 mix-blend-multiply z-10" />
             <img 
               src={heroBg} 
               alt="Hydrology Pattern" 
               className="absolute inset-0 w-full h-full object-cover opacity-40 group-hover:scale-105 transition-transform duration-700"
             />
-            <div className="absolute inset-0 z-20 flex flex-col justify-center px-8">
-              <h1 className="text-3xl font-bold text-white mb-2 tracking-tight">1729 SWMM5 Models</h1>
-              <p className="text-blue-100 max-w-xl">
-                Manage your SWMM5 models. {files.length} active files across {Object.keys(groupedFiles).length} project directories.
+            <div className="absolute inset-0 z-20 flex flex-col justify-center px-4 sm:px-8">
+              <h1 className="text-xl sm:text-3xl font-bold text-white mb-1 sm:mb-2 tracking-tight">SWMM5 Models</h1>
+              <p className="text-blue-100 text-sm sm:text-base max-w-xl">
+                {files.length} files across {Object.keys(groupedFiles).length} directories
               </p>
             </div>
           </div>
@@ -192,26 +195,28 @@ export default function Dashboard() {
           )}
 
           {/* Search Bar */}
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input 
                 placeholder="Search files and directories..." 
-                className="pl-9 h-10 bg-card border-border/60 shadow-sm"
+                className="pl-9 h-11 bg-card border-border/60 shadow-sm"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 data-testid="search-input"
               />
             </div>
-            <Button variant="outline" className="gap-2 text-muted-foreground border-border/60 shadow-sm">
-              <Filter className="h-4 w-4" /> Filters
-            </Button>
-            <Button variant="outline" className="gap-2 text-muted-foreground border-border/60 shadow-sm">
-              <SortAsc className="h-4 w-4" /> Sort
-            </Button>
-            <Button className="gap-2 shadow-md">
-              <Plus className="h-4 w-4" /> New Model
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1 sm:flex-none gap-2 text-muted-foreground border-border/60 shadow-sm h-11">
+                <Filter className="h-4 w-4" /> <span className="hidden sm:inline">Filters</span>
+              </Button>
+              <Button variant="outline" className="flex-1 sm:flex-none gap-2 text-muted-foreground border-border/60 shadow-sm h-11">
+                <SortAsc className="h-4 w-4" /> <span className="hidden sm:inline">Sort</span>
+              </Button>
+              <Button className="flex-1 sm:flex-none gap-2 shadow-md h-11">
+                <Plus className="h-4 w-4" /> <span className="hidden sm:inline">New Model</span>
+              </Button>
+            </div>
           </div>
 
           {/* Content Search */}
@@ -220,28 +225,28 @@ export default function Dashboard() {
               <FileSearch className="h-4 w-4 text-primary" />
               <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Search File Content</h3>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <div className="relative flex-1">
                 <Input
-                  placeholder="Search within .inp file content (e.g., OUTFALL, CONDUIT names)..."
+                  placeholder="Search within .inp files..."
                   value={contentSearchQuery}
                   onChange={(e) => setContentSearchQuery(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleContentSearch()}
-                  className="pr-8"
+                  className="pr-8 h-11"
                   data-testid="content-search-input"
                 />
                 {contentSearchQuery && (
                   <button
                     onClick={clearContentSearch}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1"
                   >
                     <X className="h-4 w-4" />
                   </button>
                 )}
               </div>
-              <Button onClick={handleContentSearch} disabled={isSearchingContent || !contentSearchQuery.trim()} data-testid="content-search-button">
+              <Button onClick={handleContentSearch} disabled={isSearchingContent || !contentSearchQuery.trim()} className="h-11" data-testid="content-search-button">
                 {isSearchingContent ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-                Search Content
+                <span className="ml-1">Search</span>
               </Button>
             </div>
 
@@ -324,7 +329,7 @@ export default function Dashboard() {
                 </Button>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
                 {groupedFiles[directory]
                   .filter(f => f.filename.toLowerCase().includes(searchQuery.toLowerCase()) || searchQuery === "")
                   .map((file) => (
