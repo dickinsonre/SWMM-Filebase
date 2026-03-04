@@ -32,7 +32,22 @@ export default function CompareModels() {
   const [showOnlyChanges, setShowOnlyChanges] = useState(true);
 
   const { data: files = [] } = useQuery<InpFile[]>({
-    queryKey: ["/api/inp-files"],
+    queryKey: ["/api/inp-files/all"],
+    queryFn: async () => {
+      const allFiles: InpFile[] = [];
+      let offset = 0;
+      const limit = 100;
+      let hasMore = true;
+      while (hasMore) {
+        const res = await fetch(`/api/inp-files?limit=${limit}&offset=${offset}`);
+        if (!res.ok) throw new Error("Failed to fetch files");
+        const data = await res.json();
+        allFiles.push(...data.files);
+        hasMore = data.hasMore;
+        offset += limit;
+      }
+      return allFiles;
+    },
   });
 
   const { data: compareData, isLoading, error } = useQuery<CompareResponse>({
