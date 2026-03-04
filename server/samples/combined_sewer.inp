@@ -1,0 +1,187 @@
+[TITLE]
+Combined Sewer Overflow Analysis
+CSO model with weir diversions and treatment facility
+
+[OPTIONS]
+FLOW_UNITS           CFS
+INFILTRATION         HORTON
+FLOW_ROUTING         DYNWAVE
+LINK_OFFSETS         DEPTH
+START_DATE           09/01/2024
+START_TIME           00:00:00
+END_DATE             09/02/2024
+END_TIME             00:00:00
+REPORT_STEP          00:05:00
+WET_STEP             00:05:00
+DRY_STEP             01:00:00
+ROUTING_STEP         0:00:15
+INERTIAL_DAMPING     PARTIAL
+ALLOW_PONDING        YES
+
+[RAINGAGES]
+RG1              INTENSITY 0:05     1.0      TIMESERIES Storm10yr
+
+[SUBCATCHMENTS]
+;;Name           Rain Gage        Outlet           Area     %Imperv  Width    %Slope   CurbLen  SnowPack
+CBD1             RG1              N1               8.0      85       500      0.5      0
+CBD2             RG1              N2               6.0      80       400      0.6      0
+Res1             RG1              N3               12.0     40       700      0.8      0
+Res2             RG1              N4               10.0     35       600      0.7      0
+Ind1             RG1              N5               15.0     70       800      0.4      0
+Park             RG1              N6               5.0      10       300      0.3      0
+Com1             RG1              N7               7.0      75       450      0.5      0
+
+[SUBAREAS]
+;;Subcatchment   N-Imperv   N-Perv     S-Imperv   S-Perv     PctZero    RouteTo    PctRouted
+CBD1             0.015      0.15       0.05       0.1        25         OUTLET
+CBD2             0.015      0.15       0.05       0.1        25         OUTLET
+Res1             0.012      0.2        0.05       0.15       25         OUTLET
+Res2             0.012      0.2        0.05       0.15       25         OUTLET
+Ind1             0.014      0.15       0.05       0.1        25         OUTLET
+Park             0.01       0.25       0.05       0.2        25         OUTLET
+Com1             0.013      0.15       0.05       0.1        25         OUTLET
+
+[INFILTRATION]
+;;Subcatchment   MaxRate    MinRate    Decay      DryTime    MaxInfil
+CBD1             2.0        0.5        4          7          0
+CBD2             2.0        0.5        4          7          0
+Res1             3.0        0.5        4          7          0
+Res2             3.0        0.5        4          7          0
+Ind1             2.5        0.5        4          7          0
+Park             4.0        1.0        4          7          0
+Com1             2.0        0.5        4          7          0
+
+[DWF]
+;;Node           Constituent      Baseline   Patterns
+N1               FLOW             1.5        Daily
+N2               FLOW             1.0        Daily
+N3               FLOW             2.5        Daily
+N4               FLOW             2.0        Daily
+N5               FLOW             3.0        Daily
+N7               FLOW             1.2        Daily
+
+[JUNCTIONS]
+;;Name           Elevation  MaxDepth   InitDepth  SurDepth   Aponded
+N1               120        10         0          5          1000
+N2               118        10         0          5          1000
+N3               115        12         0          5          1000
+N4               112        12         0          5          1000
+N5               110        12         0          5          1000
+N6               108        10         0          5          500
+N7               116        10         0          5          1000
+N8               105        15         0          5          2000
+CSO_Jct          104        8          0          0          0
+
+[DIVIDERS]
+;;Name           Elevation  Diverted Link    Type       Parameters
+Div1             103        CSOWeir1         WEIR       5.0
+
+[OUTFALLS]
+;;Name           Elevation  Type       Stage Data       Gated    Route To
+WWTP             98         FREE                        NO
+CSO_Out          100        FREE                        NO
+
+[CONDUITS]
+;;Name           From Node        To Node          Length     Roughness  InOffset   OutOffset  InitFlow   MaxFlow
+C1               N1               N3               600        0.013      0          0          0          0
+C2               N2               N3               500        0.013      0          0          0          0
+C3               N7               N2               400        0.013      0          0          0          0
+C4               N3               N5               700        0.014      0          0          0          0
+C5               N4               N5               500        0.013      0          0          0          0
+C6               N5               N8               400        0.014      0          0          0          0
+C7               N6               N8               300        0.013      0          0          0          0
+C8               N8               Div1             200        0.015      0          0          0          0
+Int1             Div1             WWTP             500        0.013      0          0          0          0
+CSO1             CSO_Jct          CSO_Out          100        0.015      0          0          0          0
+
+[WEIRS]
+;;Name           From Node        To Node          Type       CrestHt    Qcoeff     Gated    EndCon   EndCoeff   Surcharge  RoadWidth  RoadSurf
+CSOWeir1         Div1             CSO_Jct          TRANSVERSE 3          3.33       NO       0        0          YES
+
+[XSECTIONS]
+;;Link           Shape        Geom1            Geom2      Geom3      Geom4      Barrels    Culvert
+C1               CIRCULAR     3.0              0          0          0          1
+C2               CIRCULAR     2.5              0          0          0          1
+C3               CIRCULAR     2.0              0          0          0          1
+C4               CIRCULAR     3.5              0          0          0          1
+C5               CIRCULAR     2.5              0          0          0          1
+C6               CIRCULAR     4.0              0          0          0          1
+C7               CIRCULAR     2.0              0          0          0          1
+C8               CIRCULAR     5.0              0          0          0          1
+Int1             CIRCULAR     3.0              0          0          0          1
+CSO1             CIRCULAR     4.0              0          0          0          1
+CSOWeir1         RECT_OPEN    2                10         0          0
+
+[PATTERNS]
+;;Name           Type       Multipliers
+Daily            HOURLY     0.5  0.4  0.3  0.3  0.4  0.6
+Daily                       0.8  1.2  1.5  1.3  1.1  1.0
+Daily                       1.0  1.0  1.1  1.2  1.4  1.5
+Daily                       1.3  1.1  0.9  0.8  0.7  0.6
+
+[TIMESERIES]
+;;Name           Date       Time       Value
+Storm10yr                   0:00       0.0
+Storm10yr                   0:30       0.3
+Storm10yr                   1:00       1.0
+Storm10yr                   1:30       2.5
+Storm10yr                   2:00       4.5
+Storm10yr                   2:30       6.0
+Storm10yr                   3:00       5.0
+Storm10yr                   3:30       3.5
+Storm10yr                   4:00       2.0
+Storm10yr                   4:30       1.0
+Storm10yr                   5:00       0.5
+Storm10yr                   5:30       0.2
+Storm10yr                   6:00       0.0
+
+[REPORT]
+SUBCATCHMENTS ALL
+NODES ALL
+LINKS ALL
+
+[COORDINATES]
+;;Node           X-Coord            Y-Coord
+N1               1000               5000
+N2               3000               5000
+N3               2000               4000
+N4               4000               3000
+N5               3000               2500
+N6               5000               2000
+N7               4000               5000
+N8               3500               1500
+Div1             3500               800
+CSO_Jct          4500               600
+WWTP             2500               200
+CSO_Out          5500               200
+
+[Polygons]
+;;Subcatchment   X-Coord            Y-Coord
+CBD1             200                5800
+CBD1             1800               5800
+CBD1             1800               5200
+CBD1             200                5200
+CBD2             2200               5800
+CBD2             3800               5800
+CBD2             3800               5200
+CBD2             2200               5200
+Res1             200                4500
+Res1             2000               4500
+Res1             2000               3500
+Res1             200                3500
+Res2             3200               3500
+Res2             4800               3500
+Res2             4800               2700
+Res2             3200               2700
+Ind1             2200               3000
+Ind1             4000               3000
+Ind1             4000               2000
+Ind1             2200               2000
+Park             4200               2500
+Park             5800               2500
+Park             5800               1500
+Park             4200               1500
+Com1             3200               5800
+Com1             4800               5800
+Com1             4800               5200
+Com1             3200               5200

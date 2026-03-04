@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useFiles } from "@/context/FileContext";
 import { useRef, useState } from "react";
 import { toast } from "@/hooks/use-toast";
@@ -54,10 +55,10 @@ export function SidebarContent({ onNavigate }: SidebarContentProps) {
   const [pendingDirectory, setPendingDirectory] = useState("Imported Files");
 
   const navItems = [
-    { href: "/", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/compare", label: "Compare Models", icon: GitCompare },
-    { href: "/ai-analysis", label: "AI Analysis", icon: BrainCircuit },
-    { href: "/settings", label: "Settings", icon: Settings },
+    { href: "/", label: "Dashboard", icon: LayoutDashboard, description: "Overview of all your SWMM models and statistics" },
+    { href: "/compare", label: "Compare Models", icon: GitCompare, description: "Side-by-side comparison of model parameters" },
+    { href: "/ai-analysis", label: "AI Analysis", icon: BrainCircuit, description: "Automated model health checks and recommendations" },
+    { href: "/settings", label: "Settings", icon: Settings, description: "Configure application preferences" },
   ];
 
   const directoryCounts = files.reduce((acc, file) => {
@@ -321,22 +322,34 @@ export function SidebarContent({ onNavigate }: SidebarContentProps) {
         />
 
         <nav className="space-y-1 mb-8">
-          {navItems.map((item) => {
-            const isActive = location === item.href;
-            return (
-              <Link key={item.href} href={item.href} onClick={handleNavClick}>
-                <span className={cn(
-                  "flex items-center gap-3 px-3 py-3 rounded-md text-sm font-medium transition-colors cursor-pointer min-h-[44px]",
-                  isActive 
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground" 
-                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
-                )}>
-                  <item.icon className="h-4 w-4" />
-                  {item.label}
-                </span>
-              </Link>
-            );
-          })}
+          <TooltipProvider delayDuration={300}>
+            {navItems.map((item) => {
+              const isActive = location === item.href;
+              return (
+                <Tooltip key={item.href}>
+                  <TooltipTrigger asChild>
+                    <Link href={item.href} onClick={handleNavClick}>
+                      <span className={cn(
+                        "flex items-center gap-3 px-3 py-3 rounded-md text-sm font-medium transition-colors cursor-pointer min-h-[44px]",
+                        isActive 
+                          ? "bg-sidebar-accent text-sidebar-accent-foreground" 
+                          : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+                      )} data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}>
+                        <item.icon className="h-4 w-4" />
+                        <div className="flex flex-col">
+                          <span>{item.label}</span>
+                          <span className="text-[10px] font-normal opacity-60 leading-tight">{item.description}</span>
+                        </div>
+                      </span>
+                    </Link>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    <p>{item.description}</p>
+                  </TooltipContent>
+                </Tooltip>
+              );
+            })}
+          </TooltipProvider>
         </nav>
 
         <div className="mb-4 px-3">
@@ -449,13 +462,13 @@ export function SidebarContent({ onNavigate }: SidebarContentProps) {
           </svg>
           Sample SWMM5 Models
         </a>
-        <div className="flex items-center gap-3 px-2 py-2 rounded-md bg-sidebar-accent/30 border border-sidebar-border/50">
+        <div className="flex items-center gap-3 px-2 py-2 rounded-md bg-sidebar-accent/30 border border-sidebar-border/50" data-testid="app-version-info">
           <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary text-xs font-bold">
-            JD
+            <BrainCircuit className="h-4 w-4" />
           </div>
           <div className="flex flex-col">
-             <span className="text-xs font-medium">Jane Doe</span>
-             <span className="text-[10px] text-sidebar-foreground/50">Hydrology Lead</span>
+             <span className="text-xs font-medium">SWMM 5 Miner</span>
+             <span className="text-[10px] text-sidebar-foreground/50">v1.0.0 · Open Source</span>
           </div>
         </div>
       </div>

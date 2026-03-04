@@ -5,6 +5,8 @@ import { parseInpFile, parseCoordinates } from "./inp-parser";
 import { ObjectStorageService } from "./objectStorage";
 import multer from "multer";
 import archiver from "archiver";
+import fs from "fs";
+import path from "path";
 
 const upload = multer({ 
   storage: multer.memoryStorage(),
@@ -20,6 +22,16 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
   
+  app.get("/api/stats", async (req, res) => {
+    try {
+      const stats = await storage.getStats();
+      res.json(stats);
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+      res.status(500).json({ error: 'Failed to fetch stats' });
+    }
+  });
+
   app.get("/api/inp-files", async (req, res) => {
     try {
       const limit = parseInt(req.query.limit as string) || 100;
@@ -447,7 +459,76 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/load-samples", async (req, res) => {
+    try {
+      const samplesDir = path.join(process.cwd(), "server", "samples");
+      if (!fs.existsSync(samplesDir)) {
+        return res.status(404).json({ error: "Samples directory not found" });
+      }
+
+      const sampleFiles = fs.readdirSync(samplesDir).filter(f => f.endsWith(".inp"));
+      const { files: existingFiles } = await storage.getAllInpFilesPaginated(1000, 0);
+      const existingNames = new Set(
+        existingFiles
+          .filter(f => f.directory === "Sample Models")
+          .map(f => f.filename)
+      );
+
+      const loaded = [];
+
+      for (const filename of sampleFiles) {
+        if (existingNames.has(filename)) continue;
+        try {
+          const content = fs.readFileSync(path.join(samplesDir, filename), "utf-8");
+          const metadata = parseInpFile(content);
+          const objectPath = await objectStorageService.uploadInpFile(content, filename);
+
+          const newFile = await storage.createInpFile({
+            filename,
+            directory: "Sample Models",
+            size: Buffer.byteLength(content, "utf-8"),
+            lastModified: new Date(),
+            nodeCount: metadata.nodeCount,
+            linkCount: metadata.linkCount,
+            subcatchmentCount: metadata.subcatchmentCount,
+            description: extractTitle(content),
+            objectPath,
+          });
+          loaded.push(newFile.filename);
+        } catch (err) {
+          console.error(`Failed to load sample ${filename}:`, err);
+        }
+      }
+
+      if (loaded.length === 0) {
+        return res.json({ message: "All sample models are already loaded", loaded: 0 });
+      }
+
+      res.json({ message: `Loaded ${loaded.length} sample models`, loaded: loaded.length, files: loaded });
+    } catch (error) {
+      console.error("Error loading samples:", error);
+      res.status(500).json({ error: "Failed to load sample models" });
+    }
+  });
+
   return httpServer;
+}
+
+function extractTitle(content: string): string {
+  const lines = content.split("\n");
+  let inTitle = false;
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed === "[TITLE]") {
+      inTitle = true;
+      continue;
+    }
+    if (inTitle) {
+      if (trimmed.startsWith("[")) break;
+      if (trimmed && !trimmed.startsWith(";")) return trimmed;
+    }
+  }
+  return "Sample SWMM5 model";
 }
 
 function formatFileSize(bytes: number): string {

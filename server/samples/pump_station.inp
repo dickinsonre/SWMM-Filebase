@@ -1,0 +1,124 @@
+[TITLE]
+Pump Station with Force Main
+Demonstrates pump operations and force main hydraulics
+
+[OPTIONS]
+FLOW_UNITS           CFS
+INFILTRATION         HORTON
+FLOW_ROUTING         DYNWAVE
+LINK_OFFSETS         DEPTH
+START_DATE           03/01/2024
+START_TIME           00:00:00
+END_DATE             03/01/2024
+END_TIME             12:00:00
+REPORT_STEP          00:05:00
+WET_STEP             00:05:00
+DRY_STEP             01:00:00
+ROUTING_STEP         0:00:15
+FORCE_MAIN_EQUATION  H-W
+
+[RAINGAGES]
+RG1              INTENSITY 0:05     1.0      TIMESERIES Rain1
+
+[SUBCATCHMENTS]
+;;Name           Rain Gage        Outlet           Area     %Imperv  Width    %Slope   CurbLen  SnowPack
+S1               RG1              J1               4.0      60       400      1.0      0
+S2               RG1              J2               3.5      55       350      0.8      0
+S3               RG1              J3               5.0      45       500      0.6      0
+
+[SUBAREAS]
+;;Subcatchment   N-Imperv   N-Perv     S-Imperv   S-Perv     PctZero    RouteTo    PctRouted
+S1               0.01       0.1        0.05       0.05       25         OUTLET
+S2               0.01       0.1        0.05       0.05       25         OUTLET
+S3               0.01       0.1        0.05       0.05       25         OUTLET
+
+[INFILTRATION]
+;;Subcatchment   MaxRate    MinRate    Decay      DryTime    MaxInfil
+S1               3.0        0.5        4          7          0
+S2               3.0        0.5        4          7          0
+S3               3.0        0.5        4          7          0
+
+[JUNCTIONS]
+;;Name           Elevation  MaxDepth   InitDepth  SurDepth   Aponded
+J1               100        8          0          0          0
+J2               98         8          0          0          0
+J3               95         8          0          0          0
+J4               90         12         0          0          0
+J6               105        6          0          0          0
+
+[OUTFALLS]
+;;Name           Elevation  Type       Stage Data       Gated    Route To
+Out1             100        FREE                        NO
+
+[STORAGE]
+;;Name           Elev.    MaxDepth   InitDepth  Shape      Curve Name/Params            N/A      Fevap    Psi      Ksat     IMD
+WetWell          85       15         2          FUNCTIONAL 100       0        0          0        0
+
+[CONDUITS]
+;;Name           From Node        To Node          Length     Roughness  InOffset   OutOffset  InitFlow   MaxFlow
+C1               J1               J4               500        0.013      0          0          0          0
+C2               J2               J4               400        0.013      0          0          0          0
+C3               J3               J4               350        0.013      0          0          0          0
+C4               J4               WetWell          200        0.014      0          0          0          0
+FM1              J6               Out1             1000       0.012      0          0          0          0
+
+[PUMPS]
+;;Name           From Node        To Node          Pump Curve       Status   Sartup   Shutoff
+Pump1            WetWell          J6               PumpCurve1       ON       5        2
+
+[XSECTIONS]
+;;Link           Shape        Geom1            Geom2      Geom3      Geom4      Barrels    Culvert
+C1               CIRCULAR     2.0              0          0          0          1
+C2               CIRCULAR     1.5              0          0          0          1
+C3               CIRCULAR     2.0              0          0          0          1
+C4               CIRCULAR     2.5              0          0          0          1
+FM1              FORCE_MAIN   1.0              150        0          0          1
+
+[CURVES]
+;;Name           Type       X-Value    Y-Value
+PumpCurve1       PUMP3      0          15
+PumpCurve1                  5          12
+PumpCurve1                  10         8
+PumpCurve1                  15         3
+PumpCurve1                  18         0
+
+[TIMESERIES]
+;;Name           Date       Time       Value
+Rain1                       0:00       0.0
+Rain1                       0:30       0.5
+Rain1                       1:00       2.0
+Rain1                       1:30       4.5
+Rain1                       2:00       3.0
+Rain1                       2:30       1.5
+Rain1                       3:00       0.5
+Rain1                       3:30       0.0
+
+[REPORT]
+SUBCATCHMENTS ALL
+NODES ALL
+LINKS ALL
+
+[COORDINATES]
+;;Node           X-Coord            Y-Coord
+J1               1000               3000
+J2               3000               3000
+J3               5000               3000
+J4               3000               2000
+WetWell          3000               1000
+J6               3000               500
+Out1             6000               500
+
+[Polygons]
+;;Subcatchment   X-Coord            Y-Coord
+S1               200                3800
+S1               1800               3800
+S1               1800               3200
+S1               200                3200
+S2               2200               3800
+S2               3800               3800
+S2               3800               3200
+S2               2200               3200
+S3               4200               3800
+S3               5800               3800
+S3               5800               3200
+S3               4200               3200

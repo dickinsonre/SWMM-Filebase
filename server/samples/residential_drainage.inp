@@ -1,0 +1,192 @@
+[TITLE]
+Residential Subdivision Drainage System
+Typical suburban development with curb-and-gutter drainage
+
+[OPTIONS]
+FLOW_UNITS           CFS
+INFILTRATION         GREEN_AMPT
+FLOW_ROUTING         DYNWAVE
+LINK_OFFSETS         DEPTH
+MIN_SLOPE            0
+ALLOW_PONDING        NO
+SKIP_STEADY_STATE    NO
+START_DATE           06/15/2024
+START_TIME           00:00:00
+REPORT_START_DATE    06/15/2024
+REPORT_START_TIME    00:00:00
+END_DATE             06/15/2024
+END_TIME             06:00:00
+SWEEP_START          01/01
+SWEEP_END            12/31
+DRY_DAYS             3
+REPORT_STEP          00:05:00
+WET_STEP             00:05:00
+DRY_STEP             01:00:00
+ROUTING_STEP         0:00:15
+INERTIAL_DAMPING     PARTIAL
+NORMAL_FLOW_LIMITED  BOTH
+FORCE_MAIN_EQUATION  H-W
+VARIABLE_STEP        0.75
+
+[EVAPORATION]
+CONSTANT     0.0
+DRY_ONLY     NO
+
+[RAINGAGES]
+RG1              INTENSITY 0:05     1.0      TIMESERIES Storm25yr
+
+[SUBCATCHMENTS]
+;;Name           Rain Gage        Outlet           Area     %Imperv  Width    %Slope   CurbLen  SnowPack
+Lot1             RG1              MH1              0.8      65       200      1.0      0
+Lot2             RG1              MH1              0.6      60       180      1.2      0
+Lot3             RG1              MH2              1.0      55       250      0.8      0
+Lot4             RG1              MH2              0.7      70       200      1.0      0
+Lot5             RG1              MH3              0.9      50       220      0.9      0
+Lot6             RG1              MH3              0.5      75       160      1.1      0
+Street1          RG1              MH4              0.3      90       100      2.0      0
+Street2          RG1              MH5              0.4      95       120      1.8      0
+Park1            RG1              MH6              2.0      10       400      0.5      0
+
+[SUBAREAS]
+;;Subcatchment   N-Imperv   N-Perv     S-Imperv   S-Perv     PctZero    RouteTo    PctRouted
+Lot1             0.012      0.15       0.05       0.1        25         OUTLET
+Lot2             0.012      0.15       0.05       0.1        25         OUTLET
+Lot3             0.012      0.15       0.05       0.1        25         OUTLET
+Lot4             0.012      0.15       0.05       0.1        25         OUTLET
+Lot5             0.012      0.15       0.05       0.1        25         OUTLET
+Lot6             0.012      0.15       0.05       0.1        25         OUTLET
+Street1          0.016      0.15       0.05       0.1        25         OUTLET
+Street2          0.016      0.15       0.05       0.1        25         OUTLET
+Park1            0.01       0.2        0.05       0.15       25         OUTLET
+
+[INFILTRATION]
+;;Subcatchment   Suction    Ksat       IMD
+Lot1             3.5        0.5        0.26
+Lot2             3.5        0.5        0.26
+Lot3             3.5        0.5        0.26
+Lot4             3.5        0.5        0.26
+Lot5             3.5        0.5        0.26
+Lot6             3.5        0.5        0.26
+Street1          3.5        0.5        0.26
+Street2          3.5        0.5        0.26
+Park1            4.0        1.0        0.30
+
+[JUNCTIONS]
+;;Name           Elevation  MaxDepth   InitDepth  SurDepth   Aponded
+MH1              250        8          0          0          0
+MH2              248        8          0          0          0
+MH3              245        8          0          0          0
+MH4              243        10         0          0          0
+MH5              240        10         0          0          0
+MH6              238        10         0          0          0
+MH7              235        12         0          0          0
+
+[OUTFALLS]
+;;Name           Elevation  Type       Stage Data       Gated    Route To
+Outfall1         230        FREE                        NO
+
+[STORAGE]
+;;Name           Elev.    MaxDepth   InitDepth  Shape      Curve Name/Params            N/A      Fevap    Psi      Ksat     IMD
+Pond1            236      4          0          TABULAR    PondCurve                     0        0
+
+[CONDUITS]
+;;Name           From Node        To Node          Length     Roughness  InOffset   OutOffset  InitFlow   MaxFlow
+P1               MH1              MH4              300        0.013      0          0          0          0
+P2               MH2              MH4              250        0.013      0          0          0          0
+P3               MH3              MH5              400        0.013      0          0          0          0
+P4               MH4              MH7              350        0.013      0          0          0          0
+P5               MH5              MH6              200        0.013      0          0          0          0
+P6               MH6              MH7              300        0.014      0          0          0          0
+P7               MH7              Pond1            150        0.014      0          0          0          0
+P8               Pond1            Outfall1         100        0.015      0          0          0          0
+
+[XSECTIONS]
+;;Link           Shape        Geom1            Geom2      Geom3      Geom4      Barrels    Culvert
+P1               CIRCULAR     1.5              0          0          0          1
+P2               CIRCULAR     1.5              0          0          0          1
+P3               CIRCULAR     1.5              0          0          0          1
+P4               CIRCULAR     2.0              0          0          0          1
+P5               CIRCULAR     1.5              0          0          0          1
+P6               CIRCULAR     2.0              0          0          0          1
+P7               CIRCULAR     2.5              0          0          0          1
+P8               CIRCULAR     3.0              0          0          0          1
+
+[CURVES]
+;;Name           Type       X-Value    Y-Value
+PondCurve        STORAGE    0          500
+PondCurve                   1          800
+PondCurve                   2          1200
+PondCurve                   3          1800
+PondCurve                   4          2500
+
+[TIMESERIES]
+;;Name           Date       Time       Value
+Storm25yr                   0:00       0.0
+Storm25yr                   0:10       0.3
+Storm25yr                   0:20       0.8
+Storm25yr                   0:30       1.5
+Storm25yr                   0:40       3.0
+Storm25yr                   0:50       5.2
+Storm25yr                   1:00       4.0
+Storm25yr                   1:10       2.5
+Storm25yr                   1:20       1.5
+Storm25yr                   1:30       0.8
+Storm25yr                   1:40       0.3
+Storm25yr                   1:50       0.1
+Storm25yr                   2:00       0.0
+
+[REPORT]
+SUBCATCHMENTS ALL
+NODES ALL
+LINKS ALL
+
+[COORDINATES]
+;;Node           X-Coord            Y-Coord
+MH1              1000               4000
+MH2              3000               4000
+MH3              5000               4000
+MH4              2000               2500
+MH5              4500               2500
+MH6              4000               1500
+MH7              3000               1000
+Pond1            3500               500
+Outfall1         4000               100
+
+[Polygons]
+;;Subcatchment   X-Coord            Y-Coord
+Lot1             200                4800
+Lot1             1200               4800
+Lot1             1200               4200
+Lot1             200                4200
+Lot2             1300               4800
+Lot2             2000               4800
+Lot2             2000               4200
+Lot2             1300               4200
+Lot3             2200               4800
+Lot3             3500               4800
+Lot3             3500               4200
+Lot3             2200               4200
+Lot4             3600               4800
+Lot4             4200               4800
+Lot4             4200               4200
+Lot4             3600               4200
+Lot5             4300               4800
+Lot5             5500               4800
+Lot5             5500               4200
+Lot5             4300               4200
+Lot6             5600               4800
+Lot6             6200               4800
+Lot6             6200               4200
+Lot6             5600               4200
+Street1          1500               3000
+Street1          2500               3000
+Street1          2500               2200
+Street1          1500               2200
+Street2          3500               3000
+Street2          4500               3000
+Street2          4500               2200
+Street2          3500               2200
+Park1            2000               800
+Park1            4000               800
+Park1            4000               200
+Park1            2000               200

@@ -1,6 +1,6 @@
 import { users, inpFiles, type User, type InsertUser, type InpFile, type InsertInpFile } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, or, ilike, count } from "drizzle-orm";
+import { eq, desc, or, ilike, count, sum, sql, countDistinct } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -25,6 +25,22 @@ export interface IStorage {
   
   // Update file metadata after content edit
   updateFileMetadata(id: string, metadata: { nodeCount: number; linkCount: number; subcatchmentCount: number; size: number }): Promise<InpFile | undefined>;
+  
+  // Aggregate statistics
+  getStats(): Promise<{
+    totalFiles: number;
+    totalDirectories: number;
+    totalNodes: number;
+    totalLinks: number;
+    totalSubcatchments: number;
+    totalSizeBytes: number;
+    avgNodesPerFile: number;
+    avgLinksPerFile: number;
+    avgSubcatchmentsPerFile: number;
+    largestFile: { filename: string; size: number } | null;
+    smallestFile: { filename: string; size: number } | null;
+    directories: { name: string; fileCount: number }[];
+  }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -154,6 +170,56 @@ export class DatabaseStorage implements IStorage {
       .where(eq(inpFiles.id, id))
       .returning();
     return updated;
+  }
+
+  async getStats() {
+    const [agg] = await db.select({
+      totalFiles: count(),
+      totalDirectories: countDistinct(inpFiles.directory),
+      totalNodes: sum(inpFiles.nodeCount),
+      totalLinks: sum(inpFiles.linkCount),
+      totalSubcatchments: sum(inpFiles.subcatchmentCount),
+      totalSizeBytes: sum(inpFiles.size),
+    }).from(inpFiles);
+
+    const totalFiles = agg?.totalFiles ?? 0;
+    const totalNodes = Number(agg?.totalNodes ?? 0);
+    const totalLinks = Number(agg?.totalLinks ?? 0);
+    const totalSubcatchments = Number(agg?.totalSubcatchments ?? 0);
+    const totalSizeBytes = Number(agg?.totalSizeBytes ?? 0);
+    const totalDirectories = agg?.totalDirectories ?? 0;
+
+    const dirResults = await db.select({
+      name: inpFiles.directory,
+      fileCount: count(),
+    }).from(inpFiles).groupBy(inpFiles.directory).orderBy(desc(count()));
+
+    let largestFile: { filename: string; size: number } | null = null;
+    let smallestFile: { filename: string; size: number } | null = null;
+
+    if (totalFiles > 0) {
+      const [largest] = await db.select({ filename: inpFiles.filename, size: inpFiles.size })
+        .from(inpFiles).orderBy(desc(inpFiles.size)).limit(1);
+      const [smallest] = await db.select({ filename: inpFiles.filename, size: inpFiles.size })
+        .from(inpFiles).orderBy(inpFiles.size).limit(1);
+      if (largest) largestFile = { filename: largest.filename, size: largest.size };
+      if (smallest) smallestFile = { filename: smallest.filename, size: smallest.size };
+    }
+
+    return {
+      totalFiles,
+      totalDirectories,
+      totalNodes,
+      totalLinks,
+      totalSubcatchments,
+      totalSizeBytes,
+      avgNodesPerFile: totalFiles > 0 ? Math.round(totalNodes / totalFiles) : 0,
+      avgLinksPerFile: totalFiles > 0 ? Math.round(totalLinks / totalFiles) : 0,
+      avgSubcatchmentsPerFile: totalFiles > 0 ? Math.round(totalSubcatchments / totalFiles) : 0,
+      largestFile,
+      smallestFile,
+      directories: dirResults.map(d => ({ name: d.name, fileCount: d.fileCount })),
+    };
   }
 }
 

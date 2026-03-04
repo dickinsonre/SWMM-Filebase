@@ -1,0 +1,140 @@
+[TITLE]
+Simple Stormwater Network - Tutorial Model
+A basic network demonstrating fundamental SWMM5 concepts
+
+[OPTIONS]
+FLOW_UNITS           CFS
+INFILTRATION         HORTON
+FLOW_ROUTING         DYNWAVE
+LINK_OFFSETS         DEPTH
+MIN_SLOPE            0
+ALLOW_PONDING        NO
+SKIP_STEADY_STATE    NO
+START_DATE           01/01/2024
+START_TIME           00:00:00
+REPORT_START_DATE    01/01/2024
+REPORT_START_TIME    00:00:00
+END_DATE             01/01/2024
+END_TIME             12:00:00
+SWEEP_START          01/01
+SWEEP_END            12/31
+DRY_DAYS             5
+REPORT_STEP          00:05:00
+WET_STEP             00:05:00
+DRY_STEP             01:00:00
+ROUTING_STEP         0:00:30
+INERTIAL_DAMPING     PARTIAL
+NORMAL_FLOW_LIMITED  BOTH
+FORCE_MAIN_EQUATION  H-W
+VARIABLE_STEP        0.75
+LENGTHENING_STEP     0
+MIN_SURFAREA         12.566
+MAX_TRIALS           8
+HEAD_TOLERANCE       0.005
+SYS_FLOW_TOL        5
+LAT_FLOW_TOL        5
+
+[EVAPORATION]
+CONSTANT     0.0
+DRY_ONLY     NO
+
+[RAINGAGES]
+RG1              INTENSITY 0:05     1.0      TIMESERIES DesignStorm
+
+[SUBCATCHMENTS]
+;;Name           Rain Gage        Outlet           Area     %Imperv  Width    %Slope   CurbLen  SnowPack
+S1               RG1              J1               5.0      50       500      0.5      0
+S2               RG1              J2               8.0      35       600      0.8      0
+S3               RG1              J3               3.0      70       400      0.3      0
+S4               RG1              J4               6.5      45       550      0.6      0
+
+[SUBAREAS]
+;;Subcatchment   N-Imperv   N-Perv     S-Imperv   S-Perv     PctZero    RouteTo    PctRouted
+S1               0.01       0.1        0.05       0.05       25         OUTLET
+S2               0.01       0.1        0.05       0.05       25         OUTLET
+S3               0.012      0.1        0.05       0.05       25         OUTLET
+S4               0.01       0.1        0.05       0.05       25         OUTLET
+
+[INFILTRATION]
+;;Subcatchment   MaxRate    MinRate    Decay      DryTime    MaxInfil
+S1               3.0        0.5        4          7          0
+S2               3.0        0.5        4          7          0
+S3               3.0        0.5        4          7          0
+S4               3.0        0.5        4          7          0
+
+[JUNCTIONS]
+;;Name           Elevation  MaxDepth   InitDepth  SurDepth   Aponded
+J1               100        6          0          0          0
+J2               97         6          0          0          0
+J3               95         6          0          0          0
+J4               93         8          0          0          0
+J5               90         8          0          0          0
+
+[OUTFALLS]
+;;Name           Elevation  Type       Stage Data       Gated    Route To
+Out1             85         FREE                        NO
+
+[CONDUITS]
+;;Name           From Node        To Node          Length     Roughness  InOffset   OutOffset  InitFlow   MaxFlow
+C1               J1               J2               400        0.013      0          0          0          0
+C2               J2               J3               350        0.013      0          0          0          0
+C3               J3               J5               500        0.014      0          0          0          0
+C4               J4               J5               300        0.013      0          0          0          0
+C5               J5               Out1             200        0.015      0          0          0          0
+
+[XSECTIONS]
+;;Link           Shape        Geom1            Geom2      Geom3      Geom4      Barrels    Culvert
+C1               CIRCULAR     2.0              0          0          0          1
+C2               CIRCULAR     2.5              0          0          0          1
+C3               CIRCULAR     3.0              0          0          0          1
+C4               CIRCULAR     2.0              0          0          0          1
+C5               CIRCULAR     4.0              0          0          0          1
+
+[TIMESERIES]
+;;Name           Date       Time       Value
+DesignStorm                 0:00       0.0
+DesignStorm                 0:15       0.5
+DesignStorm                 0:30       1.2
+DesignStorm                 0:45       2.5
+DesignStorm                 1:00       4.0
+DesignStorm                 1:15       3.2
+DesignStorm                 1:30       2.0
+DesignStorm                 1:45       1.0
+DesignStorm                 2:00       0.5
+DesignStorm                 2:15       0.2
+DesignStorm                 2:30       0.0
+
+[REPORT]
+SUBCATCHMENTS ALL
+NODES ALL
+LINKS ALL
+
+[COORDINATES]
+;;Node           X-Coord            Y-Coord
+J1               1000               3000
+J2               2000               2500
+J3               3000               2000
+J4               1500               1500
+J5               3500               1000
+Out1             4500               500
+
+[VERTICES]
+
+[Polygons]
+;;Subcatchment   X-Coord            Y-Coord
+S1               500                3500
+S1               1500               3500
+S1               1500               2500
+S1               500                2500
+S2               1500               3000
+S2               2500               3000
+S2               2500               2000
+S2               1500               2000
+S3               2500               2500
+S3               3500               2500
+S3               3500               1500
+S3               2500               1500
+S4               800                2000
+S4               2000               2000
+S4               2000               1000
+S4               800                1000
