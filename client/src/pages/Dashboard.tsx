@@ -14,7 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
-import { getReswmmConfig, type ReswmmConfig } from "./Settings";
+import { getReswmmConfig, type ReswmmConfig } from "./ReSWMM";
 import heroBg from "@assets/generated_images/technical_hydrology_network_blueprint_abstract_background.png";
 
 type SortField = "name" | "size" | "nodeCount" | "linkCount" | "subcatchmentCount";

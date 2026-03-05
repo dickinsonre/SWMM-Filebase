@@ -8,6 +8,7 @@ import Dashboard from "@/pages/Dashboard";
 import AIAnalysis from "@/pages/AIAnalysis";
 import Settings from "@/pages/Settings";
 import CompareModels from "@/pages/CompareModels";
+import ReSWMM from "@/pages/ReSWMM";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -16,6 +17,7 @@ function Router() {
       <Route path="/" component={Dashboard} />
       <Route path="/compare" component={CompareModels} />
       <Route path="/ai-analysis" component={AIAnalysis} />
+      <Route path="/reswmm" component={ReSWMM} />
       <Route path="/settings" component={Settings} />
       <Route component={NotFound} />
     </Switch>
