@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { parseInpFile, parseCoordinates } from "./inp-parser";
 import { ObjectStorageService } from "./objectStorage";
+import { applyReswmm, DEFAULT_RESWMM, type ReswmmConfig } from "./reswmm";
 import multer from "multer";
 import archiver from "archiver";
 import fs from "fs";
@@ -508,6 +509,120 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error loading samples:", error);
       res.status(500).json({ error: "Failed to load sample models" });
+    }
+  });
+
+  app.post("/api/reswmm/apply", async (req, res) => {
+    try {
+      const { directory, config } = req.body as { directory: string; config: ReswmmConfig };
+
+      if (!directory) {
+        return res.status(400).json({ error: "Directory is required" });
+      }
+
+      const reswmmConfig: ReswmmConfig = {
+        ...DEFAULT_RESWMM,
+        ...config,
+        enabled: true,
+      };
+
+      if (reswmmConfig.fixedMinLength < 1 || reswmmConfig.fixedMaxLength < 1) {
+        return res.status(400).json({ error: "Segment lengths must be positive" });
+      }
+      if (reswmmConfig.fixedMinLength > reswmmConfig.fixedMaxLength) {
+        return res.status(400).json({ error: "Min length cannot exceed max length" });
+      }
+      if (reswmmConfig.dxDRatio < 0.5) {
+        return res.status(400).json({ error: "Dx/D ratio must be at least 0.5" });
+      }
+      if (reswmmConfig.mnsa <= 0) {
+        return res.status(400).json({ error: "MNSA must be positive" });
+      }
+
+      const dirFiles = await storage.getInpFilesByDirectory(directory);
+      if (dirFiles.length === 0) {
+        return res.status(404).json({ error: `No files found in directory "${directory}"` });
+      }
+
+      const results: { filename: string; changed: boolean; stats: any; newFileId?: string }[] = [];
+      let filesChanged = 0;
+
+      for (const file of dirFiles) {
+        if (file.filename.endsWith('_Disc.inp')) continue;
+
+        try {
+          const content = await objectStorageService.getInpFileContent(file.objectPath);
+          const result = applyReswmm(content, reswmmConfig);
+
+          if (result.changed) {
+            filesChanged++;
+            const discFilename = file.filename.replace(/\.inp$/i, '_Disc.inp');
+
+            const existingDisc = dirFiles.find(f => f.filename === discFilename);
+            if (existingDisc) {
+              await objectStorageService.updateInpFileContent(existingDisc.objectPath, result.discretizedContent);
+              const metadata = parseInpFile(result.discretizedContent);
+              await storage.updateFileMetadata(existingDisc.id, {
+                nodeCount: metadata.nodeCount,
+                linkCount: metadata.linkCount,
+                subcatchmentCount: metadata.subcatchmentCount,
+                size: Buffer.byteLength(result.discretizedContent, 'utf-8'),
+              });
+              results.push({
+                filename: discFilename,
+                changed: true,
+                stats: result.stats,
+                newFileId: existingDisc.id,
+              });
+            } else {
+              const objectPath = await objectStorageService.uploadInpFile(result.discretizedContent, discFilename);
+              const metadata = parseInpFile(result.discretizedContent);
+              const newFile = await storage.createInpFile({
+                filename: discFilename,
+                directory: file.directory,
+                size: Buffer.byteLength(result.discretizedContent, 'utf-8'),
+                lastModified: new Date(),
+                nodeCount: metadata.nodeCount,
+                linkCount: metadata.linkCount,
+                subcatchmentCount: metadata.subcatchmentCount,
+                description: `ReSWMM discretized from ${file.filename}`,
+                objectPath,
+              });
+              results.push({
+                filename: discFilename,
+                changed: true,
+                stats: result.stats,
+                newFileId: newFile.id,
+              });
+            }
+          } else {
+            results.push({
+              filename: file.filename,
+              changed: false,
+              stats: result.stats,
+            });
+          }
+        } catch (err) {
+          console.error(`ReSWMM error for ${file.filename}:`, err);
+          results.push({
+            filename: file.filename,
+            changed: false,
+            stats: { error: String(err) },
+          });
+        }
+      }
+
+      res.json({
+        directory,
+        totalFiles: dirFiles.filter(f => !f.filename.endsWith('_Disc.inp')).length,
+        filesChanged,
+        filesCreated: results.filter(r => r.changed).length,
+        method: reswmmConfig.method,
+        results,
+      });
+    } catch (error) {
+      console.error("Error applying ReSWMM:", error);
+      res.status(500).json({ error: "Failed to apply ReSWMM discretization" });
     }
   });
 

@@ -6,7 +6,7 @@ import { InpFile, QuickAccessFile, ContentSearchResult, searchFileContent, getPi
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Search, Filter, SortAsc, Plus, Loader2, Pin, Clock, FileSearch, Download, X, Check, ArrowUp, ArrowDown, Activity, GitBranch, Database, FolderOpen, BarChart3, Map, BrainCircuit, GitCompare, Pickaxe } from "lucide-react";
+import { Search, Filter, SortAsc, Plus, Loader2, Pin, Clock, FileSearch, Download, X, Check, ArrowUp, ArrowDown, Activity, GitBranch, Database, FolderOpen, BarChart3, Map, BrainCircuit, GitCompare, Pickaxe, Scissors } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "wouter";
 import { toast } from "@/hooks/use-toast";
@@ -14,6 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
+import { getReswmmConfig, type ReswmmConfig } from "./Settings";
 import heroBg from "@assets/generated_images/technical_hydrology_network_blueprint_abstract_background.png";
 
 type SortField = "name" | "size" | "nodeCount" | "linkCount" | "subcatchmentCount";
@@ -61,6 +62,7 @@ export default function Dashboard() {
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [stats, setStats] = useState<StatsData | null>(null);
   const [loadingSamples, setLoadingSamples] = useState(false);
+  const [applyingReswmm, setApplyingReswmm] = useState<string | null>(null);
   const [filters, setFilters] = useState<FilterState>({
     minNodes: 0,
     maxNodes: Infinity,
@@ -206,6 +208,45 @@ export default function Dashboard() {
       });
     } finally {
       setExportingDir(null);
+    }
+  };
+
+  const handleApplyReswmm = async (directory: string) => {
+    const config = getReswmmConfig();
+    if (!config.enabled) {
+      toast({
+        title: "ReSWMM not enabled",
+        description: "Enable ReSWMM in Settings first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setApplyingReswmm(directory);
+    try {
+      const res = await fetch("/api/reswmm/apply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ directory, config }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to apply ReSWMM");
+      }
+      toast({
+        title: "ReSWMM Complete",
+        description: `${data.filesChanged} of ${data.totalFiles} files discretized. ${data.filesCreated} _Disc.inp files created.`,
+      });
+      refreshFiles();
+      loadStats();
+    } catch (err) {
+      toast({
+        title: "ReSWMM failed",
+        description: err instanceof Error ? err.message : "Failed to apply ReSWMM",
+        variant: "destructive",
+      });
+    } finally {
+      setApplyingReswmm(null);
     }
   };
 
@@ -706,6 +747,21 @@ export default function Dashboard() {
                   {directory}
                 </h2>
                 <div className="h-px flex-1 bg-border/60" />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleApplyReswmm(directory)}
+                  disabled={applyingReswmm === directory}
+                  className="text-muted-foreground hover:text-foreground"
+                  data-testid={`reswmm-dir-${directory}`}
+                >
+                  {applyingReswmm === directory ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Scissors className="h-4 w-4" />
+                  )}
+                  <span className="ml-1 text-xs">ReSWMM</span>
+                </Button>
                 <Button
                   variant="ghost"
                   size="sm"

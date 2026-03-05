@@ -57,6 +57,15 @@ Object Storage:
 ### INP File Parser
 A custom parser (`server/inp-parser.ts`) extracts metadata from SWMM5 `.inp` files by reading section headers and counting elements in sections like JUNCTIONS, CONDUITS, SUBCATCHMENTS, etc.
 
+### ReSWMM Conduit Discretization Engine
+- **Engine**: `server/reswmm.ts` — implements the ReSWMM algorithm (originally by Robson Leo Pachaly)
+- **Purpose**: Splits long conduits into shorter segments with intermediate junction nodes for better CFL stability
+- **Methods**: Fixed Interval (min/max length range) or Δx/D Ratio (segment length proportional to pipe diameter)
+- **API**: `POST /api/reswmm/apply` — applies discretization to all files in a directory, creating `_Disc.inp` output files
+- **Config**: Stored in browser localStorage, configurable via Settings page
+- **Key parameters**: fixedMinLength, fixedMaxLength, dxDRatio, MNSA (Minimum Nodal Surface Area)
+- **Sections modified**: [TITLE], [JUNCTIONS], [CONDUITS], [XSECTIONS], [LOSSES], [COORDINATES]
+
 ### Build System
 - Development: Vite dev server with HMR for frontend, tsx watch for backend
 - Production: Custom build script that uses Vite for frontend and esbuild for backend bundling
