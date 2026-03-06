@@ -469,7 +469,7 @@ export function SidebarContent({ onNavigate }: SidebarContentProps) {
             <BrainCircuit className="h-4 w-4" />
           </div>
           <div className="flex flex-col">
-             <span className="text-xs font-medium">SWMM 5 Miner</span>
+             <span className="text-xs font-medium">SWMM5 Network Miner</span>
              <span className="text-[10px] text-sidebar-foreground/50">v1.0.0 · Open Source</span>
           </div>
         </div>

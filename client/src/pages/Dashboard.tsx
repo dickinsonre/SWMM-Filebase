@@ -480,7 +480,7 @@ export default function Dashboard() {
 
               <div className="text-center py-12 border-2 border-dashed border-primary/30 rounded-xl bg-primary/5">
                 <Pickaxe className="h-12 w-12 text-primary/40 mx-auto mb-4" />
-                <h2 className="text-xl font-bold mb-2">Get Started with SWMM 5 Miner</h2>
+                <h2 className="text-xl font-bold mb-2">Get Started with SWMM5 Network Miner</h2>
                 <p className="text-muted-foreground mb-6 max-w-md mx-auto">
                   Upload your own .inp files using the sidebar, or load our sample models to explore the app's features right away.
                 </p>
