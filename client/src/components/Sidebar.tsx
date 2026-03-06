@@ -493,7 +493,7 @@ export function SidebarContent({ onNavigate }: SidebarContentProps) {
           
           <ScrollArea className="flex-1 max-h-[300px] pr-4">
             <div className="space-y-1">
-              {pendingFiles.map((file, idx) => (
+              {[...pendingFiles].sort((a, b) => b.size - a.size).map((file, idx) => (
                 <div 
                   key={idx} 
                   className="flex items-center gap-2 py-2.5 px-2 rounded hover:bg-muted/50 cursor-pointer min-h-[44px]"
