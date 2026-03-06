@@ -9,7 +9,6 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 
-  /* Technical Slate Theme */
   --color-background: hsl(var(--background));
   --color-foreground: hsl(var(--foreground));
   
@@ -50,78 +49,34 @@
   --font-sans: 'Inter', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
   
-  --radius: 0.25rem; /* 4px - tighter radius for technical look */
+  --radius: 0.25rem;
 }
 
-/* LIGHT MODE - Technical Slate/Blue */
-:root {
-  --background: 210 20% 98%; /* Very light blue-grey */
-  --foreground: 222 47% 11%; /* Dark slate */
+/* ========================================================
+   EPA THEME (Default) — Technical Blue / Slate
+   ======================================================== */
 
+/* EPA Light */
+:root, .theme-epa {
+  --background: 210 20% 98%;
+  --foreground: 222 47% 11%;
   --card: 0 0% 100%;
   --card-foreground: 222 47% 11%;
-
   --popover: 0 0% 100%;
   --popover-foreground: 222 47% 11%;
-
-  --primary: 221 83% 53%; /* Technical Blue */
+  --primary: 221 83% 53%;
   --primary-foreground: 210 40% 98%;
-
   --secondary: 210 40% 96.1%;
   --secondary-foreground: 222 47% 11.2%;
-
   --muted: 210 40% 96.1%;
   --muted-foreground: 215.4 16.3% 46.9%;
-
   --accent: 210 40% 96.1%;
   --accent-foreground: 222 47% 11.2%;
-
   --destructive: 0 84.2% 60.2%;
   --destructive-foreground: 210 40% 98%;
-
   --border: 214.3 31.8% 91.4%;
   --input: 214.3 31.8% 91.4%;
   --ring: 221 83% 53%;
-
-  --sidebar: 222 47% 11%; /* Dark Sidebar */
-  --sidebar-foreground: 210 40% 98%;
-  --sidebar-primary: 221 83% 53%;
-  --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 217 33% 17%;
-  --sidebar-accent-foreground: 210 40% 98%;
-  --sidebar-border: 217 33% 17%;
-  --sidebar-ring: 217 91% 60%;
-}
-
-.dark {
-  --background: 222 47% 11%;
-  --foreground: 210 40% 98%;
-
-  --card: 222 47% 11%;
-  --card-foreground: 210 40% 98%;
-
-  --popover: 222 47% 11%;
-  --popover-foreground: 210 40% 98%;
-
-  --primary: 217 91% 60%;
-  --primary-foreground: 222 47% 11.2%;
-
-  --secondary: 217 33% 17.5%;
-  --secondary-foreground: 210 40% 98%;
-
-  --muted: 217 33% 17.5%;
-  --muted-foreground: 215 20.2% 65.1%;
-
-  --accent: 217 33% 17.5%;
-  --accent-foreground: 210 40% 98%;
-
-  --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 210 40% 98%;
-
-  --border: 217 33% 17.5%;
-  --input: 217 33% 17.5%;
-  --ring: 212.7 26.8% 83.9%;
-  
   --sidebar: 222 47% 11%;
   --sidebar-foreground: 210 40% 98%;
   --sidebar-primary: 221 83% 53%;
@@ -130,6 +85,235 @@
   --sidebar-accent-foreground: 210 40% 98%;
   --sidebar-border: 217 33% 17%;
   --sidebar-ring: 217 91% 60%;
+}
+
+/* EPA Dark */
+.dark.theme-epa, .dark .theme-epa {
+  --background: 222 47% 11%;
+  --foreground: 210 40% 98%;
+  --card: 222 47% 13%;
+  --card-foreground: 210 40% 98%;
+  --popover: 222 47% 13%;
+  --popover-foreground: 210 40% 98%;
+  --primary: 217 91% 60%;
+  --primary-foreground: 222 47% 11.2%;
+  --secondary: 217 33% 17.5%;
+  --secondary-foreground: 210 40% 98%;
+  --muted: 217 33% 17.5%;
+  --muted-foreground: 215 20.2% 65.1%;
+  --accent: 217 33% 17.5%;
+  --accent-foreground: 210 40% 98%;
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 217 33% 17.5%;
+  --input: 217 33% 17.5%;
+  --ring: 212.7 26.8% 83.9%;
+  --sidebar: 222 47% 8%;
+  --sidebar-foreground: 210 40% 98%;
+  --sidebar-primary: 217 91% 60%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 217 33% 14%;
+  --sidebar-accent-foreground: 210 40% 98%;
+  --sidebar-border: 217 33% 14%;
+  --sidebar-ring: 217 91% 60%;
+}
+
+/* ========================================================
+   UF THEME — University of Florida Orange (#FA4616) + Blue (#0021A5)
+   ======================================================== */
+
+/* UF Light */
+.theme-uf {
+  --background: 30 30% 97%;
+  --foreground: 225 100% 15%;
+  --card: 0 0% 100%;
+  --card-foreground: 225 100% 15%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 225 100% 15%;
+  --primary: 14 96% 53%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 30 30% 94%;
+  --secondary-foreground: 225 100% 15%;
+  --muted: 30 20% 95%;
+  --muted-foreground: 225 20% 46%;
+  --accent: 225 100% 32%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 30 20% 88%;
+  --input: 30 20% 88%;
+  --ring: 14 96% 53%;
+  --sidebar: 225 100% 18%;
+  --sidebar-foreground: 30 30% 97%;
+  --sidebar-primary: 14 96% 53%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 225 100% 24%;
+  --sidebar-accent-foreground: 30 30% 97%;
+  --sidebar-border: 225 80% 22%;
+  --sidebar-ring: 14 96% 53%;
+}
+
+/* UF Dark */
+.dark.theme-uf, .dark .theme-uf {
+  --background: 225 60% 10%;
+  --foreground: 30 30% 95%;
+  --card: 225 50% 13%;
+  --card-foreground: 30 30% 95%;
+  --popover: 225 50% 13%;
+  --popover-foreground: 30 30% 95%;
+  --primary: 14 96% 53%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 225 40% 18%;
+  --secondary-foreground: 30 30% 95%;
+  --muted: 225 40% 18%;
+  --muted-foreground: 225 15% 60%;
+  --accent: 225 80% 45%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 62% 30%;
+  --destructive-foreground: 30 30% 95%;
+  --border: 225 40% 18%;
+  --input: 225 40% 18%;
+  --ring: 14 96% 53%;
+  --sidebar: 225 70% 8%;
+  --sidebar-foreground: 30 30% 95%;
+  --sidebar-primary: 14 96% 53%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 225 60% 14%;
+  --sidebar-accent-foreground: 30 30% 95%;
+  --sidebar-border: 225 50% 14%;
+  --sidebar-ring: 14 96% 53%;
+}
+
+/* ========================================================
+   OREGON STATE THEME — Beaver Orange (#D73F09) + Black
+   ======================================================== */
+
+/* Oregon State Light */
+.theme-oregon-state {
+  --background: 20 15% 97%;
+  --foreground: 0 0% 8%;
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 8%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 8%;
+  --primary: 16 91% 44%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 20 15% 93%;
+  --secondary-foreground: 0 0% 8%;
+  --muted: 20 10% 94%;
+  --muted-foreground: 0 0% 40%;
+  --accent: 0 0% 15%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 20 10% 87%;
+  --input: 20 10% 87%;
+  --ring: 16 91% 44%;
+  --sidebar: 0 0% 8%;
+  --sidebar-foreground: 20 10% 95%;
+  --sidebar-primary: 16 91% 44%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 0 0% 16%;
+  --sidebar-accent-foreground: 20 10% 95%;
+  --sidebar-border: 0 0% 16%;
+  --sidebar-ring: 16 91% 50%;
+}
+
+/* Oregon State Dark */
+.dark.theme-oregon-state, .dark .theme-oregon-state {
+  --background: 0 0% 7%;
+  --foreground: 20 10% 95%;
+  --card: 0 0% 10%;
+  --card-foreground: 20 10% 95%;
+  --popover: 0 0% 10%;
+  --popover-foreground: 20 10% 95%;
+  --primary: 16 91% 50%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 0 0% 15%;
+  --secondary-foreground: 20 10% 95%;
+  --muted: 0 0% 15%;
+  --muted-foreground: 0 0% 55%;
+  --accent: 16 70% 35%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 62% 30%;
+  --destructive-foreground: 20 10% 95%;
+  --border: 0 0% 16%;
+  --input: 0 0% 16%;
+  --ring: 16 91% 50%;
+  --sidebar: 0 0% 5%;
+  --sidebar-foreground: 20 10% 95%;
+  --sidebar-primary: 16 91% 50%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 0 0% 12%;
+  --sidebar-accent-foreground: 20 10% 95%;
+  --sidebar-border: 0 0% 12%;
+  --sidebar-ring: 16 91% 50%;
+}
+
+/* ========================================================
+   AUBURN THEME — Burnt Orange (#DD550C) + Navy (#03244D)
+   ======================================================== */
+
+/* Auburn Light */
+.theme-auburn {
+  --background: 220 20% 97%;
+  --foreground: 213 90% 16%;
+  --card: 0 0% 100%;
+  --card-foreground: 213 90% 16%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 213 90% 16%;
+  --primary: 24 90% 46%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 220 20% 93%;
+  --secondary-foreground: 213 90% 16%;
+  --muted: 220 15% 94%;
+  --muted-foreground: 213 25% 45%;
+  --accent: 213 90% 16%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 220 15% 88%;
+  --input: 220 15% 88%;
+  --ring: 24 90% 46%;
+  --sidebar: 213 90% 16%;
+  --sidebar-foreground: 220 20% 95%;
+  --sidebar-primary: 24 90% 46%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 213 70% 22%;
+  --sidebar-accent-foreground: 220 20% 95%;
+  --sidebar-border: 213 70% 22%;
+  --sidebar-ring: 24 90% 52%;
+}
+
+/* Auburn Dark */
+.dark.theme-auburn, .dark .theme-auburn {
+  --background: 213 70% 9%;
+  --foreground: 220 20% 95%;
+  --card: 213 60% 12%;
+  --card-foreground: 220 20% 95%;
+  --popover: 213 60% 12%;
+  --popover-foreground: 220 20% 95%;
+  --primary: 24 90% 50%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 213 50% 17%;
+  --secondary-foreground: 220 20% 95%;
+  --muted: 213 50% 17%;
+  --muted-foreground: 213 15% 58%;
+  --accent: 24 70% 35%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 62% 30%;
+  --destructive-foreground: 220 20% 95%;
+  --border: 213 50% 17%;
+  --input: 213 50% 17%;
+  --ring: 24 90% 50%;
+  --sidebar: 213 80% 7%;
+  --sidebar-foreground: 220 20% 95%;
+  --sidebar-primary: 24 90% 50%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 213 60% 13%;
+  --sidebar-accent-foreground: 220 20% 95%;
+  --sidebar-border: 213 60% 13%;
+  --sidebar-ring: 24 90% 50%;
 }
 
 @layer base {

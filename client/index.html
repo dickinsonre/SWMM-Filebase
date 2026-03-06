@@ -2,6 +2,12 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      try {
+        var t = JSON.parse(localStorage.getItem('swmm-theme') || '{}');
+        document.documentElement.className = (t.dark !== false ? 'dark' : 'light') + ' theme-' + (t.colorTheme || 'epa');
+      } catch(e) { document.documentElement.className = 'dark theme-epa'; }
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
 
     <meta property="og:title" content="SWMM 5 Miner" />
