@@ -47,6 +47,8 @@ interface StatsData {
   totalSizeBytes: number;
   avgNodesPerFile: number;
   avgLinksPerFile: number;
+  inpCount: number;
+  xpCount: number;
 }
 
 function parseSize(size: string): number {
@@ -387,6 +389,11 @@ export default function Dashboard() {
                   <div>
                     <p className="text-2xl font-bold" data-testid="stat-total-files">{stats.totalFiles}</p>
                     <p className="text-xs text-muted-foreground">Models</p>
+                    <p className="text-[10px] text-muted-foreground/70 mt-0.5">
+                      {stats.inpCount > 0 && <span>{stats.inpCount} .inp</span>}
+                      {stats.inpCount > 0 && stats.xpCount > 0 && <span> · </span>}
+                      {stats.xpCount > 0 && <span>{stats.xpCount} .xp</span>}
+                    </p>
                   </div>
                 </CardContent>
               </Card>

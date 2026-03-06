@@ -40,6 +40,8 @@ export interface IStorage {
     largestFile: { filename: string; size: number } | null;
     smallestFile: { filename: string; size: number } | null;
     directories: { name: string; fileCount: number }[];
+    inpCount: number;
+    xpCount: number;
   }>;
 }
 
@@ -206,6 +208,11 @@ export class DatabaseStorage implements IStorage {
       if (smallest) smallestFile = { filename: smallest.filename, size: smallest.size };
     }
 
+    const [extCounts] = await db.select({
+      inpCount: sql<number>`count(*) filter (where lower(${inpFiles.filename}) like '%.inp')`,
+      xpCount: sql<number>`count(*) filter (where lower(${inpFiles.filename}) like '%.xp')`,
+    }).from(inpFiles);
+
     return {
       totalFiles,
       totalDirectories,
@@ -219,6 +226,8 @@ export class DatabaseStorage implements IStorage {
       largestFile,
       smallestFile,
       directories: dirResults.map(d => ({ name: d.name, fileCount: d.fileCount })),
+      inpCount: Number(extCounts?.inpCount ?? 0),
+      xpCount: Number(extCounts?.xpCount ?? 0),
     };
   }
 }
