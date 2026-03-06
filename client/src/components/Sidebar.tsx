@@ -316,7 +316,6 @@ export function SidebarContent({ onNavigate }: SidebarContentProps) {
           type="file" 
           ref={dirInputRef} 
           className="hidden" 
-          accept=".inp"
           // @ts-ignore
           webkitdirectory="" 
           directory=""
