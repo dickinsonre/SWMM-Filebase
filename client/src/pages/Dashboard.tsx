@@ -87,7 +87,7 @@ export default function Dashboard() {
   });
   const [filterOpen, setFilterOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
-  const { files, loading, error, refreshFiles } = useFiles();
+  const { files, loading, error, refreshFiles, refreshCounter } = useFiles();
 
   const allDirectories = useMemo(() => {
     return Array.from(new Set(files.map(f => f.directory))).sort();
@@ -123,7 +123,8 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadStats();
-  }, [files.length]);
+    loadQuickAccess();
+  }, [refreshCounter]);
 
   useEffect(() => {
     if (!contentHighlightFile) return;

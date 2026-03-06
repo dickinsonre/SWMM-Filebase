@@ -10,6 +10,7 @@ interface FileContextType {
   removeFile: (id: string) => Promise<void>;
   removeDirectory: (directory: string) => Promise<void>;
   refreshFiles: () => Promise<void>;
+  refreshCounter: number;
 }
 
 const FileContext = createContext<FileContextType | undefined>(undefined);
@@ -18,6 +19,7 @@ export function FileProvider({ children }: { children: ReactNode }) {
   const [files, setFiles] = useState<InpFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshCounter, setRefreshCounter] = useState(0);
 
   const refreshFiles = async () => {
     try {
@@ -38,6 +40,7 @@ export function FileProvider({ children }: { children: ReactNode }) {
       setError(null);
       const result = await api.uploadInpFiles(filesToUpload, directory);
       await refreshFiles();
+      setRefreshCounter(c => c + 1);
       return result;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to upload files');
@@ -50,6 +53,7 @@ export function FileProvider({ children }: { children: ReactNode }) {
       setError(null);
       await api.deleteInpFile(id);
       setFiles((prev) => prev.filter((f) => f.id !== id));
+      setRefreshCounter(c => c + 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete file');
       throw err;
@@ -61,6 +65,7 @@ export function FileProvider({ children }: { children: ReactNode }) {
       setError(null);
       await api.deleteDirectory(directory);
       setFiles((prev) => prev.filter((f) => f.directory !== directory));
+      setRefreshCounter(c => c + 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete directory');
       throw err;
@@ -73,7 +78,7 @@ export function FileProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <FileContext.Provider value={{ files, loading, error, uploadFiles, removeFile, removeDirectory, refreshFiles }}>
+    <FileContext.Provider value={{ files, loading, error, uploadFiles, removeFile, removeDirectory, refreshFiles, refreshCounter }}>
       {children}
     </FileContext.Provider>
   );
