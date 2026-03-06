@@ -2,11 +2,11 @@ import { useState, useEffect, useMemo } from "react";
 import { Sidebar, MobileHeader } from "@/components/Sidebar";
 import { FileCard } from "@/components/FileCard";
 import { useFiles } from "@/context/FileContext";
-import { InpFile, QuickAccessFile, ContentSearchResult, searchFileContent, getPinnedFiles, getRecentFiles, exportDirectory } from "@/lib/api";
+import { InpFile, QuickAccessFile, ContentSearchResult, searchFileContent, getPinnedFiles, getRecentFiles, exportDirectory, getInpFile } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Search, Filter, SortAsc, Plus, Loader2, Pin, Clock, FileSearch, Download, X, Check, ArrowUp, ArrowDown, Activity, GitBranch, Database, FolderOpen, BarChart3, Map, BrainCircuit, GitCompare, Pickaxe, Scissors, ChevronDown, ChevronRight } from "lucide-react";
+import { Search, Filter, SortAsc, Plus, Loader2, Pin, Clock, FileSearch, Download, X, Check, ArrowUp, ArrowDown, Activity, GitBranch, Database, FolderOpen, BarChart3, Map, BrainCircuit, GitCompare, Pickaxe, Scissors, ChevronDown, ChevronRight, Eye } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "wouter";
 import { toast } from "@/hooks/use-toast";
@@ -14,8 +14,18 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { getReswmmConfig, type ReswmmConfig } from "./ReSWMM";
 import heroBg from "@assets/generated_images/technical_hydrology_network_blueprint_abstract_background.png";
+
+function highlightText(text: string, term: string) {
+  if (!term) return text;
+  const regex = new RegExp(`(${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+  const parts = text.split(regex);
+  return parts.map((part, i) =>
+    regex.test(part) ? <mark key={i} className="bg-primary/30 text-foreground rounded px-0.5">{part}</mark> : part
+  );
+}
 
 type SortField = "name" | "size" | "nodeCount" | "linkCount" | "subcatchmentCount";
 type SortDirection = "asc" | "desc";
@@ -54,6 +64,10 @@ export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [contentSearchQuery, setContentSearchQuery] = useState("");
   const [contentSearchResults, setContentSearchResults] = useState<ContentSearchResult[]>([]);
+  const [contentHighlightFile, setContentHighlightFile] = useState<{ id: string; term: string } | null>(null);
+  const [highlightFileContent, setHighlightFileContent] = useState("");
+  const [highlightFileLoading, setHighlightFileLoading] = useState(false);
+  const [highlightFileName, setHighlightFileName] = useState("");
   const [isSearchingContent, setIsSearchingContent] = useState(false);
   const [pinnedFiles, setPinnedFiles] = useState<QuickAccessFile[]>([]);
   const [recentFiles, setRecentFiles] = useState<QuickAccessFile[]>([]);
@@ -110,6 +124,20 @@ export default function Dashboard() {
   useEffect(() => {
     loadStats();
   }, [files.length]);
+
+  useEffect(() => {
+    if (!contentHighlightFile) return;
+    setHighlightFileLoading(true);
+    getInpFile(contentHighlightFile.id).then((data) => {
+      setHighlightFileContent(data.fileContent || "");
+      setHighlightFileName(data.filename);
+      setHighlightFileLoading(false);
+    }).catch(() => {
+      setHighlightFileLoading(false);
+      toast({ title: "Error", description: "Failed to load file content", variant: "destructive" });
+      setContentHighlightFile(null);
+    });
+  }, [contentHighlightFile]);
 
   const loadQuickAccess = async () => {
     try {
@@ -654,6 +682,25 @@ export default function Dashboard() {
                     </PopoverContent>
                   </Popover>
 
+                  <Button
+                    variant="outline"
+                    className="flex-1 sm:flex-none gap-2 text-muted-foreground border-border/60 shadow-sm h-11"
+                    onClick={() => {
+                      if (collapsedDirs.size === filteredDirectories.length) {
+                        setCollapsedDirs(new Set());
+                      } else {
+                        setCollapsedDirs(new Set(filteredDirectories));
+                      }
+                    }}
+                    data-testid="button-collapse-all"
+                  >
+                    {collapsedDirs.size === filteredDirectories.length ? (
+                      <><ChevronDown className="h-4 w-4" /> <span className="hidden sm:inline">Expand All</span></>
+                    ) : (
+                      <><ChevronRight className="h-4 w-4" /> <span className="hidden sm:inline">Collapse All</span></>
+                    )}
+                  </Button>
+
                   <Button className="flex-1 sm:flex-none gap-2 shadow-md h-11" data-testid="button-new-model">
                     <Plus className="h-4 w-4" /> <span className="hidden sm:inline">New Model</span>
                   </Button>
@@ -708,13 +755,24 @@ export default function Dashboard() {
                         <div key={result.id} className="bg-muted/30 rounded-lg p-3 border border-border/40" data-testid={`search-result-${result.id}`}>
                           <div className="flex items-center justify-between mb-2">
                             <span className="font-mono text-sm font-medium">{result.filename}</span>
-                            <span className="text-xs text-muted-foreground">{result.directory}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground">{result.directory}</span>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 px-2 text-xs"
+                                onClick={() => setContentHighlightFile({ id: result.id, term: contentSearchQuery })}
+                                data-testid={`view-search-result-${result.id}`}
+                              >
+                                <Eye className="h-3 w-3 mr-1" /> View
+                              </Button>
+                            </div>
                           </div>
                           <div className="space-y-1 max-h-32 overflow-y-auto">
                             {result.matches.slice(0, 5).map((match, idx) => (
                               <div key={idx} className="text-xs font-mono bg-background/50 p-1.5 rounded flex gap-2" data-testid={`match-line-${result.id}-${idx}`}>
                                 <span className="text-muted-foreground shrink-0">L{match.lineNumber}:</span>
-                                <span className="truncate">{match.content}</span>
+                                <span className="truncate">{highlightText(match.content, contentSearchQuery)}</span>
                               </div>
                             ))}
                             {result.matches.length > 5 && (
@@ -742,61 +800,64 @@ export default function Dashboard() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3 }}
             >
-              <button
-                className="flex items-center gap-2 mb-4 w-full text-left group cursor-pointer"
-                onClick={() => setCollapsedDirs(prev => {
-                  const next = new Set(prev);
-                  next.has(directory) ? next.delete(directory) : next.add(directory);
-                  return next;
-                })}
-                data-testid={`toggle-dir-${directory}`}
-              >
-                {collapsedDirs.has(directory) ? (
-                  <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 transition-transform" />
-                ) : (
-                  <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0 transition-transform" />
-                )}
-                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-primary/60" />
-                  {directory}
-                </h2>
-                <span className="text-xs text-muted-foreground/70 tabular-nums">
-                  ({groupedFiles[directory]?.length ?? 0})
-                </span>
-                <div className="h-px flex-1 bg-border/60" />
-                <span className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleApplyReswmm(directory)}
-                    disabled={applyingReswmm === directory}
-                    className="text-muted-foreground hover:text-foreground"
-                    data-testid={`reswmm-dir-${directory}`}
-                  >
-                    {applyingReswmm === directory ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Scissors className="h-4 w-4" />
-                    )}
-                    <span className="ml-1 text-xs">ReSWMM</span>
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleExportDirectory(directory)}
-                    disabled={exportingDir === directory}
-                    className="text-muted-foreground hover:text-foreground"
-                    data-testid={`export-dir-${directory}`}
-                  >
-                    {exportingDir === directory ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Download className="h-4 w-4" />
-                    )}
-                    <span className="ml-1 text-xs">Export</span>
-                  </Button>
-                </span>
-              </button>
+              <div className="flex items-center gap-2 mb-4">
+                <div
+                  className="flex items-center gap-2 flex-1 cursor-pointer select-none"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setCollapsedDirs(prev => {
+                    const next = new Set(prev);
+                    next.has(directory) ? next.delete(directory) : next.add(directory);
+                    return next;
+                  })}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setCollapsedDirs(prev => { const next = new Set(prev); next.has(directory) ? next.delete(directory) : next.add(directory); return next; }); }}}
+                  data-testid={`toggle-dir-${directory}`}
+                >
+                  {collapsedDirs.has(directory) ? (
+                    <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 transition-transform" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0 transition-transform" />
+                  )}
+                  <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary/60" />
+                    {directory}
+                  </h2>
+                  <span className="text-xs text-muted-foreground/70 tabular-nums">
+                    ({groupedFiles[directory]?.length ?? 0})
+                  </span>
+                  <div className="h-px flex-1 bg-border/60" />
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleApplyReswmm(directory)}
+                  disabled={applyingReswmm === directory}
+                  className="text-muted-foreground hover:text-foreground"
+                  data-testid={`reswmm-dir-${directory}`}
+                >
+                  {applyingReswmm === directory ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Scissors className="h-4 w-4" />
+                  )}
+                  <span className="ml-1 text-xs">ReSWMM</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleExportDirectory(directory)}
+                  disabled={exportingDir === directory}
+                  className="text-muted-foreground hover:text-foreground"
+                  data-testid={`export-dir-${directory}`}
+                >
+                  {exportingDir === directory ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4" />
+                  )}
+                  <span className="ml-1 text-xs">Export</span>
+                </Button>
+              </div>
               
               <AnimatePresence initial={false}>
                 {!collapsedDirs.has(directory) && (
@@ -829,6 +890,30 @@ export default function Dashboard() {
         </div>
 
       </main>
+
+      <Dialog open={!!contentHighlightFile} onOpenChange={(open) => !open && setContentHighlightFile(null)}>
+        <DialogContent className="w-[95vw] max-w-4xl h-[90vh] sm:h-auto sm:max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="font-mono text-sm sm:text-base">
+              {highlightFileName}
+            </DialogTitle>
+          </DialogHeader>
+          {highlightFileLoading ? (
+            <div className="flex-1 flex items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <div className="flex-1 min-h-0 overflow-auto bg-muted/30 rounded-md p-3 font-mono text-xs leading-5" data-testid="highlight-viewer">
+              {highlightFileContent.split('\n').map((line, i) => (
+                <div key={i} className="flex gap-3 hover:bg-muted/50">
+                  <span className="text-muted-foreground/50 select-none shrink-0 w-10 text-right tabular-nums">{i + 1}</span>
+                  <span className="whitespace-pre">{contentHighlightFile ? highlightText(line, contentHighlightFile.term) : line}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

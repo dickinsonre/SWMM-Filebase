@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronDown, ChevronRight, GitCompare, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
+import { ChevronDown, ChevronRight, GitCompare, Loader2, AlertCircle, CheckCircle2, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { compareInpFiles, type SectionDiff, type DiffLine } from "@/lib/diff";
 
@@ -75,6 +75,62 @@ export default function CompareModels() {
       }
       return next;
     });
+  };
+
+  const generateMarkdownReport = () => {
+    if (!diffResult || !compareData) return;
+
+    const lines: string[] = [];
+    lines.push(`# SWMM5 Model Comparison Report`);
+    lines.push('');
+    lines.push(`**Generated:** ${new Date().toLocaleString()}`);
+    lines.push('');
+    lines.push(`## Files Compared`);
+    lines.push('');
+    lines.push(`| | Filename | Directory | Nodes | Links | Subcatchments |`);
+    lines.push(`|---|---|---|---|---|---|`);
+    lines.push(`| Base | ${compareData.file1.filename} | ${compareData.file1.directory} | ${compareData.file1.nodeCount} | ${compareData.file1.linkCount} | ${compareData.file1.subcatchmentCount} |`);
+    lines.push(`| Compare | ${compareData.file2.filename} | ${compareData.file2.directory} | ${compareData.file2.nodeCount} | ${compareData.file2.linkCount} | ${compareData.file2.subcatchmentCount} |`);
+    lines.push('');
+    lines.push(`## Summary`);
+    lines.push('');
+    lines.push(`- **Lines Added:** ${stats.added}`);
+    lines.push(`- **Lines Removed:** ${stats.removed}`);
+    lines.push(`- **Lines Unchanged:** ${stats.unchanged}`);
+    lines.push(`- **Sections Changed:** ${stats.changedSections} of ${diffResult.length}`);
+    lines.push('');
+    lines.push(`## Section-by-Section Diff`);
+    lines.push('');
+
+    for (const section of diffResult) {
+      if (!section.hasChanges) continue;
+      const changeCount = section.lines.filter(l => l.type !== 'unchanged').length;
+      lines.push(`### [${section.name}] — ${changeCount} change${changeCount !== 1 ? 's' : ''}`);
+      lines.push('');
+      lines.push('```diff');
+      for (const line of section.lines) {
+        if (line.type === 'added') {
+          lines.push(`+ ${line.content}`);
+        } else if (line.type === 'removed') {
+          lines.push(`- ${line.content}`);
+        } else {
+          lines.push(`  ${line.content}`);
+        }
+      }
+      lines.push('```');
+      lines.push('');
+    }
+
+    const content = lines.join('\n');
+    const blob = new Blob([content], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `comparison_${compareData.file1.filename}_vs_${compareData.file2.filename}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const sectionsToShow = useMemo(() => {
@@ -207,14 +263,25 @@ export default function CompareModels() {
                     {compareData.file2.filename}
                   </Badge>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowOnlyChanges(!showOnlyChanges)}
-                  data-testid="button-toggle-changes"
-                >
-                  {showOnlyChanges ? "Show All Sections" : "Show Only Changes"}
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={generateMarkdownReport}
+                    data-testid="button-download-report"
+                  >
+                    <Download className="h-4 w-4 mr-1" />
+                    Download Report
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowOnlyChanges(!showOnlyChanges)}
+                    data-testid="button-toggle-changes"
+                  >
+                    {showOnlyChanges ? "Show All Sections" : "Show Only Changes"}
+                  </Button>
+                </div>
               </div>
 
               {sectionsToShow.length === 0 ? (

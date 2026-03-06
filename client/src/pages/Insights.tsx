@@ -21,7 +21,6 @@ interface InsightsData {
   totalElements: number;
   totalConduits: number;
   processedFiles: number;
-  sampledFiles: number;
   pipeDiameters: ChartBin[];
   shapes: ChartBin[];
   manningsN: ChartBin[];

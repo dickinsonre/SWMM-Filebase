@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FileText, Activity, GitBranch, Database, MoreVertical, Folder, Map, Eye, Loader2, Copy, Check, Pin, Download, Play, FileOutput, Save, X } from "lucide-react";
+import { FileText, Activity, GitBranch, Database, MoreVertical, Folder, Map, Eye, Loader2, Copy, Check, Pin, Download, Play, FileOutput, Save, X, ExternalLink, Wrench, Zap } from "lucide-react";
 import { InpFile, CoordinateData, togglePinFile, exportFiles, recordFileAccess, updateInpFileContent } from "@/lib/api";
 import { useFiles } from "@/context/FileContext";
 import { toast } from "@/hooks/use-toast";
@@ -38,9 +38,11 @@ import { MinecraftMap } from "./MinecraftMap";
 interface FileCardProps {
   file: InpFile;
   onPinChange?: () => void;
+  highlightTerm?: string;
+  autoOpen?: boolean;
 }
 
-export function FileCard({ file, onPinChange }: FileCardProps) {
+export function FileCard({ file, onPinChange, highlightTerm, autoOpen }: FileCardProps) {
   const { removeFile } = useFiles();
   const [showContent, setShowContent] = useState(false);
   const [showMap, setShowMap] = useState(false);
@@ -315,6 +317,34 @@ export function FileCard({ file, onPinChange }: FileCardProps) {
               <DropdownMenuItem onClick={handleRunSimulation} disabled={simulationLoading} data-testid={`run-simulation-${file.id}`}>
                 <Play className="h-4 w-4 mr-2" />
                 {simulationLoading ? "Running..." : "Run Simulation"}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => {
+                toast({
+                  title: "Opening in Engine",
+                  description: `${file.filename} will open in ReSWMM Engine`,
+                });
+              }} data-testid={`open-engine-${file.id}`}>
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Open in Engine
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => {
+                toast({
+                  title: "Opening in INP MAKER",
+                  description: `${file.filename} will open in INP MAKER`,
+                });
+              }} data-testid={`open-inp-maker-${file.id}`}>
+                <Wrench className="h-4 w-4 mr-2" />
+                Open in INP MAKER
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => {
+                toast({
+                  title: "Submitting to BatchSWMM",
+                  description: `${file.filename} will be submitted to BatchSWMM for processing`,
+                });
+              }} data-testid={`run-batchswmm-${file.id}`}>
+                <Zap className="h-4 w-4 mr-2" />
+                Run in BatchSWMM
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem className="text-destructive" onClick={() => setShowDeleteConfirm(true)} data-testid={`delete-file-${file.id}`}>

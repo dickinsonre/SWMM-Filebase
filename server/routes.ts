@@ -657,17 +657,10 @@ export async function registerRoutes(
       const conduitLengths: number[] = [];
       const offsetPatterns: Record<string, number> = { 'Both Zero': 0, 'Outlet Only': 0, 'Inlet Only': 0, 'Both Nonzero': 0 };
 
-      const sampleSize = Math.min(files.length, 150);
-      const indices = new Set<number>();
-      while (indices.size < sampleSize) {
-        indices.add(Math.floor(Math.random() * files.length));
-      }
-      const sampleFiles = Array.from(indices).map(i => files[i]);
-
       let processedCount = 0;
       const batchSize = 20;
-      for (let i = 0; i < sampleFiles.length; i += batchSize) {
-        const batch = sampleFiles.slice(i, i + batchSize);
+      for (let i = 0; i < files.length; i += batchSize) {
+        const batch = files.slice(i, i + batchSize);
         const contents = await Promise.allSettled(
           batch.map(f => objectStorageService.getInpFileContent(f.objectPath))
         );
@@ -775,7 +768,6 @@ export async function registerRoutes(
         totalElements,
         totalConduits,
         processedFiles: processedCount,
-        sampledFiles: sampleSize,
         pipeDiameters: Object.entries(diameterBins).map(([label, count]) => ({ label, count })),
         shapes: Object.entries(shapes).map(([label, count]) => ({ label, count })).sort((a, b) => b.count - a.count),
         manningsN: Object.entries(manningsNBins).map(([label, count]) => ({ label, count })),
