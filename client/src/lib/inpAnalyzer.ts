@@ -4,18 +4,26 @@ export interface AnalysisIssue {
   section?: string;
 }
 
+export interface SectionCategory {
+  name: string;
+  sections: { name: string; found: boolean }[];
+  completeness: number;
+}
+
 export interface AnalysisResult {
   score: number;
   summary: string;
   issues: AnalysisIssue[];
   suggestions: string[];
   sectionCounts: Record<string, number>;
+  sectionCategories: SectionCategory[];
   stats: {
     nodeCount: number;
     linkCount: number;
     subcatchmentCount: number;
     totalSections: number;
     missingSections: string[];
+    foundSections: string[];
   };
 }
 
@@ -120,6 +128,26 @@ export function analyzeInpFile(content: string): AnalysisResult {
   const subcatchmentCount = sectionCounts['SUBCATCHMENTS'] || 0;
   const totalSections = foundSections.size;
   const missingSections = EXPECTED_SECTIONS.filter(s => !foundSections.has(s));
+
+  const SECTION_CATEGORIES = [
+    { name: 'Core Network', sections: ['JUNCTIONS', 'OUTFALLS', 'STORAGE', 'DIVIDERS', 'CONDUITS', 'PUMPS', 'ORIFICES', 'WEIRS', 'OUTLETS'] },
+    { name: 'Geometry', sections: ['XSECTIONS', 'TRANSECTS', 'COORDINATES', 'VERTICES', 'MAP', 'POLYGONS'] },
+    { name: 'Hydrology', sections: ['RAINGAGES', 'SUBCATCHMENTS', 'SUBAREAS', 'INFILTRATION', 'AQUIFERS', 'GROUNDWATER'] },
+    { name: 'Hydraulics', sections: ['OPTIONS', 'REPORT', 'LOSSES', 'CONTROLS', 'CURVES', 'TIMESERIES', 'PATTERNS', 'DWF', 'INFLOWS'] },
+    { name: 'Water Quality', sections: ['POLLUTANTS', 'LANDUSES', 'BUILDUP', 'WASHOFF', 'COVERAGES', 'TREATMENT', 'LOADINGS'] },
+    { name: 'Green Infrastructure', sections: ['LID_CONTROLS', 'LID_USAGE'] },
+    { name: 'Snow & Climate', sections: ['SNOWPACKS', 'TEMPERATURE', 'EVAPORATION', 'ADJUSTMENTS'] },
+  ];
+
+  const sectionCategories: SectionCategory[] = SECTION_CATEGORIES.map(cat => {
+    const secs = cat.sections.map(s => ({ name: s, found: foundSections.has(s) }));
+    const foundCount = secs.filter(s => s.found).length;
+    return {
+      name: cat.name,
+      sections: secs,
+      completeness: secs.length > 0 ? Math.round((foundCount / secs.length) * 100) : 0,
+    };
+  });
 
   if (outfallIds.size === 0 && nodeCount > 0) {
     issues.push({ type: 'error', message: 'No outfall nodes defined — the model has no drainage outlet.', section: 'OUTFALLS' });
@@ -261,12 +289,14 @@ export function analyzeInpFile(content: string): AnalysisResult {
     issues,
     suggestions,
     sectionCounts,
+    sectionCategories,
     stats: {
       nodeCount,
       linkCount,
       subcatchmentCount,
       totalSections,
       missingSections,
+      foundSections: Array.from(foundSections),
     },
   };
 }

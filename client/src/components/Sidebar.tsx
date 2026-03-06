@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, BrainCircuit, Settings, FolderOpen, UploadCloud, Search, FolderInput, ChevronDown, ChevronRight, Trash2, GitCompare, Loader2, Menu, Scissors } from "lucide-react";
+import { LayoutDashboard, BrainCircuit, Settings, FolderOpen, UploadCloud, Search, FolderInput, ChevronDown, ChevronRight, Trash2, GitCompare, Loader2, Menu, Scissors, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
@@ -58,6 +58,7 @@ export function SidebarContent({ onNavigate }: SidebarContentProps) {
     { href: "/", label: "Dashboard", icon: LayoutDashboard, description: "Overview of all your SWMM models and statistics" },
     { href: "/compare", label: "Compare Models", icon: GitCompare, description: "Side-by-side comparison of model parameters" },
     { href: "/ai-analysis", label: "AI Analysis", icon: BrainCircuit, description: "Automated model health checks and recommendations" },
+    { href: "/insights", label: "Database Insights", icon: BarChart3, description: "Statistical analysis across all loaded models" },
     { href: "/reswmm", label: "ReSWMM", icon: Scissors, description: "Conduit discretization for CFL stability" },
     { href: "/settings", label: "Settings", icon: Settings, description: "Configure application preferences" },
   ];

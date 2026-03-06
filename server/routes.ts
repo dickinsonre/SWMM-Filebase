@@ -626,6 +626,172 @@ export async function registerRoutes(
     }
   });
 
+  let insightsCache: { data: any; timestamp: number } | null = null;
+  const INSIGHTS_CACHE_TTL = 5 * 60 * 1000;
+
+  app.get("/api/insights", async (req, res) => {
+    try {
+      if (insightsCache && Date.now() - insightsCache.timestamp < INSIGHTS_CACHE_TTL) {
+        return res.json(insightsCache.data);
+      }
+
+      const { files } = await storage.getAllInpFilesPaginated(2000, 0);
+      if (files.length === 0) {
+        return res.json({ totalModels: 0, totalElements: 0, totalConduits: 0, pipeDiameters: [], shapes: [], manningsN: [], conduitLengths: [], offsets: [], modelComplexity: [] });
+      }
+
+      const modelComplexity = files.map(f => ({
+        filename: f.filename,
+        directory: f.directory,
+        nodes: f.nodeCount,
+        links: f.linkCount,
+        subcatchments: f.subcatchmentCount,
+      }));
+
+      const totalElements = files.reduce((s, f) => s + f.nodeCount + f.linkCount + f.subcatchmentCount, 0);
+      const totalConduits = files.reduce((s, f) => s + f.linkCount, 0);
+
+      const pipeDiameters: number[] = [];
+      const shapes: Record<string, number> = {};
+      const manningsN: number[] = [];
+      const conduitLengths: number[] = [];
+      const offsetPatterns: Record<string, number> = { 'Both Zero': 0, 'Outlet Only': 0, 'Inlet Only': 0, 'Both Nonzero': 0 };
+
+      const sampleSize = Math.min(files.length, 150);
+      const indices = new Set<number>();
+      while (indices.size < sampleSize) {
+        indices.add(Math.floor(Math.random() * files.length));
+      }
+      const sampleFiles = Array.from(indices).map(i => files[i]);
+
+      let processedCount = 0;
+      const batchSize = 20;
+      for (let i = 0; i < sampleFiles.length; i += batchSize) {
+        const batch = sampleFiles.slice(i, i + batchSize);
+        const contents = await Promise.allSettled(
+          batch.map(f => objectStorageService.getInpFileContent(f.objectPath))
+        );
+
+        for (const result of contents) {
+          if (result.status !== 'fulfilled') continue;
+          const content = result.value;
+          processedCount++;
+
+          let currentSection = '';
+          const conduitOffsets = new Map<string, { inOffset: number; outOffset: number }>();
+
+          for (const line of content.split('\n')) {
+            const trimmed = line.trim();
+            if (!trimmed || trimmed.startsWith(';')) continue;
+            if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+              currentSection = trimmed.slice(1, -1).toUpperCase();
+              continue;
+            }
+
+            const parts = trimmed.split(/\s+/);
+
+            if (currentSection === 'CONDUITS' && parts.length >= 5) {
+              const length = parseFloat(parts[3]);
+              const roughness = parseFloat(parts[4]);
+              if (!isNaN(length) && length > 0 && length < 100000) conduitLengths.push(length);
+              if (!isNaN(roughness) && roughness > 0 && roughness < 1) manningsN.push(roughness);
+              if (parts.length >= 7) {
+                const inOff = parseFloat(parts[5]) || 0;
+                const outOff = parseFloat(parts[6]) || 0;
+                conduitOffsets.set(parts[0], { inOffset: inOff, outOffset: outOff });
+              }
+            }
+
+            if (currentSection === 'XSECTIONS' && parts.length >= 3) {
+              const shape = parts[1].toUpperCase();
+              const geom1 = parseFloat(parts[2]);
+              shapes[shape] = (shapes[shape] || 0) + 1;
+              if (!isNaN(geom1) && geom1 > 0 && geom1 < 1000) {
+                if (shape === 'CIRCULAR' || shape === 'FILLED_CIRCULAR' || shape === 'FORCE_MAIN') {
+                  const diamInches = geom1 < 10 ? Math.round(geom1 * 12) : Math.round(geom1);
+                  pipeDiameters.push(diamInches);
+                }
+              }
+            }
+          }
+
+          for (const [, off] of conduitOffsets) {
+            if (off.inOffset === 0 && off.outOffset === 0) offsetPatterns['Both Zero']++;
+            else if (off.inOffset === 0 && off.outOffset !== 0) offsetPatterns['Outlet Only']++;
+            else if (off.inOffset !== 0 && off.outOffset === 0) offsetPatterns['Inlet Only']++;
+            else offsetPatterns['Both Nonzero']++;
+          }
+        }
+      }
+
+      const diameterBins: Record<string, number> = {};
+      for (const d of pipeDiameters) {
+        const binSizes = [4, 6, 8, 10, 12, 15, 18, 21, 24, 30, 36, 42, 48, 54, 60, 72, 84, 96];
+        let binLabel = '96+';
+        for (const b of binSizes) {
+          if (d <= b) { binLabel = `${b}"`; break; }
+        }
+        diameterBins[binLabel] = (diameterBins[binLabel] || 0) + 1;
+      }
+
+      const manningsNBins: Record<string, number> = {};
+      const nRanges = [
+        { label: '0.009-0.011', min: 0, max: 0.011 },
+        { label: '0.011-0.013', min: 0.011, max: 0.013 },
+        { label: '0.013-0.015', min: 0.013, max: 0.015 },
+        { label: '0.015-0.020', min: 0.015, max: 0.020 },
+        { label: '0.020-0.030', min: 0.020, max: 0.030 },
+        { label: '0.030+', min: 0.030, max: Infinity },
+      ];
+      for (const n of manningsN) {
+        for (const r of nRanges) {
+          if (n >= r.min && n < r.max) {
+            manningsNBins[r.label] = (manningsNBins[r.label] || 0) + 1;
+            break;
+          }
+        }
+      }
+
+      const lengthBins: Record<string, number> = {};
+      const lengthRanges = [
+        { label: '0-50', min: 0, max: 50 },
+        { label: '50-100', min: 50, max: 100 },
+        { label: '100-200', min: 100, max: 200 },
+        { label: '200-500', min: 200, max: 500 },
+        { label: '500-1000', min: 500, max: 1000 },
+        { label: '1000+', min: 1000, max: Infinity },
+      ];
+      for (const l of conduitLengths) {
+        for (const r of lengthRanges) {
+          if (l >= r.min && l < r.max) {
+            lengthBins[r.label] = (lengthBins[r.label] || 0) + 1;
+            break;
+          }
+        }
+      }
+
+      const insightsData = {
+        totalModels: files.length,
+        totalElements,
+        totalConduits,
+        processedFiles: processedCount,
+        sampledFiles: sampleSize,
+        pipeDiameters: Object.entries(diameterBins).map(([label, count]) => ({ label, count })),
+        shapes: Object.entries(shapes).map(([label, count]) => ({ label, count })).sort((a, b) => b.count - a.count),
+        manningsN: Object.entries(manningsNBins).map(([label, count]) => ({ label, count })),
+        conduitLengths: Object.entries(lengthBins).map(([label, count]) => ({ label, count })),
+        offsets: Object.entries(offsetPatterns).map(([label, count]) => ({ label, count })),
+        modelComplexity,
+      };
+
+      insightsCache = { data: insightsData, timestamp: Date.now() };
+      res.json(insightsData);
+    } catch (error) {
+      console.error('Error computing insights:', error);
+      res.status(500).json({ error: 'Failed to compute insights' });
+    }
+  });
+
   return httpServer;
 }
 

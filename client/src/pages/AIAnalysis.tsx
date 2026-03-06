@@ -9,7 +9,20 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useFiles } from "@/context/FileContext";
 import { getInpFile } from "@/lib/api";
-import { analyzeInpFile, type AnalysisResult } from "@/lib/inpAnalyzer";
+import { analyzeInpFile, type AnalysisResult, type SectionCategory } from "@/lib/inpAnalyzer";
+
+interface Percentiles {
+  nodePercentile: number;
+  linkPercentile: number;
+  subcatchmentPercentile: number;
+}
+
+function computePercentile(value: number, allValues: number[]): number {
+  if (allValues.length === 0) return 50;
+  const sorted = [...allValues].sort((a, b) => a - b);
+  let below = sorted.filter(v => v < value).length;
+  return Math.round((below / sorted.length) * 100);
+}
 
 export default function AIAnalysis() {
   const { files, loading: filesLoading } = useFiles();
@@ -18,6 +31,7 @@ export default function AIAnalysis() {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [analyzedFileName, setAnalyzedFileName] = useState<string>("");
+  const [percentiles, setPercentiles] = useState<Percentiles | null>(null);
 
   useEffect(() => {
     if (files.length > 0 && !selectedFileId) {
@@ -45,6 +59,19 @@ export default function AIAnalysis() {
 
       const analysisResult = analyzeInpFile(fileData.fileContent);
       setResult(analysisResult);
+
+      if (files.length > 1) {
+        const allNodes = files.map(f => f.nodeCount);
+        const allLinks = files.map(f => f.linkCount);
+        const allSubs = files.map(f => f.subcatchmentCount);
+        setPercentiles({
+          nodePercentile: computePercentile(analysisResult.stats.nodeCount, allNodes),
+          linkPercentile: computePercentile(analysisResult.stats.linkCount, allLinks),
+          subcatchmentPercentile: computePercentile(analysisResult.stats.subcatchmentCount, allSubs),
+        });
+      } else {
+        setPercentiles(null);
+      }
     } catch (err) {
       setAnalysisError(err instanceof Error ? err.message : "Failed to analyze file");
     } finally {
@@ -196,16 +223,44 @@ export default function AIAnalysis() {
                        <div className="text-center p-2 rounded bg-muted/30 border border-border/50">
                          <div className="text-lg font-bold" data-testid="text-stat-nodes">{result.stats.nodeCount}</div>
                          <div className="text-xs text-muted-foreground">Nodes</div>
+                         {percentiles && (
+                           <div className="text-[10px] text-primary font-medium mt-0.5" data-testid="text-node-percentile">
+                             {percentiles.nodePercentile}th percentile
+                           </div>
+                         )}
                        </div>
                        <div className="text-center p-2 rounded bg-muted/30 border border-border/50">
                          <div className="text-lg font-bold" data-testid="text-stat-links">{result.stats.linkCount}</div>
                          <div className="text-xs text-muted-foreground">Links</div>
+                         {percentiles && (
+                           <div className="text-[10px] text-primary font-medium mt-0.5" data-testid="text-link-percentile">
+                             {percentiles.linkPercentile}th percentile
+                           </div>
+                         )}
                        </div>
                        <div className="text-center p-2 rounded bg-muted/30 border border-border/50">
                          <div className="text-lg font-bold" data-testid="text-stat-subcatchments">{result.stats.subcatchmentCount}</div>
                          <div className="text-xs text-muted-foreground">Subcatchments</div>
+                         {percentiles && (
+                           <div className="text-[10px] text-primary font-medium mt-0.5" data-testid="text-sub-percentile">
+                             {percentiles.subcatchmentPercentile}th percentile
+                           </div>
+                         )}
                        </div>
                      </div>
+
+                     {percentiles && (
+                       <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 mb-4" data-testid="percentile-comparison">
+                         <div className="text-xs font-medium text-primary mb-1">Compared to {files.length} loaded models</div>
+                         <p className="text-xs text-muted-foreground">
+                           This model's complexity is in the {percentiles.nodePercentile}th percentile for nodes
+                           and {percentiles.linkPercentile}th percentile for links.
+                           {percentiles.nodePercentile >= 75 && " It's a larger-than-average model."}
+                           {percentiles.nodePercentile <= 25 && " It's a smaller-than-average model."}
+                           {percentiles.nodePercentile > 25 && percentiles.nodePercentile < 75 && " It's an average-sized model."}
+                         </p>
+                       </div>
+                     )}
 
                      <div className="flex items-center gap-2 mb-3 text-sm text-muted-foreground">
                        <span>{result.stats.totalSections} sections found</span>
@@ -213,6 +268,46 @@ export default function AIAnalysis() {
                          <span>· {result.stats.missingSections.length} common sections missing</span>
                        )}
                      </div>
+
+                     {result.sectionCategories && result.sectionCategories.length > 0 && (
+                       <div className="space-y-2 mb-4" data-testid="section-completeness">
+                         <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Section Completeness</div>
+                         {result.sectionCategories.map((cat, i) => (
+                           <div key={i} className="space-y-1" data-testid={`section-cat-${i}`}>
+                             <div className="flex items-center justify-between text-xs">
+                               <span className="font-medium">{cat.name}</span>
+                               <span className="text-muted-foreground">
+                                 {cat.sections.filter(s => s.found).length}/{cat.sections.length} ({cat.completeness}%)
+                               </span>
+                             </div>
+                             <div className="h-2 bg-muted/30 rounded-full overflow-hidden">
+                               <div
+                                 className={`h-full rounded-full transition-all ${
+                                   cat.completeness === 100 ? 'bg-green-500' :
+                                   cat.completeness >= 50 ? 'bg-blue-500' :
+                                   cat.completeness > 0 ? 'bg-amber-500' : 'bg-muted/50'
+                                 }`}
+                                 style={{ width: `${cat.completeness}%` }}
+                               />
+                             </div>
+                             <div className="flex flex-wrap gap-1">
+                               {cat.sections.map((sec, j) => (
+                                 <span
+                                   key={j}
+                                   className={`text-[10px] px-1.5 py-0.5 rounded ${
+                                     sec.found
+                                       ? 'bg-green-500/10 text-green-700 dark:text-green-400'
+                                       : 'bg-muted/30 text-muted-foreground line-through'
+                                   }`}
+                                 >
+                                   {sec.name}
+                                 </span>
+                               ))}
+                             </div>
+                           </div>
+                         ))}
+                       </div>
+                     )}
                      
                      {result.issues.length > 0 ? (
                        <div className="space-y-2 max-h-64 overflow-y-auto">

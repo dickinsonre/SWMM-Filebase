@@ -20,10 +20,11 @@ Preferred communication style: Simple, everyday language.
 - **Build Tool**: Vite
 
 The frontend follows a component-based architecture with:
-- Pages in `client/src/pages/` (Dashboard, CompareModels, AIAnalysis, Settings, NotFound)
+- Pages in `client/src/pages/` (Dashboard, CompareModels, AIAnalysis, Insights, ReSWMM, Settings, NotFound)
 - Reusable components in `client/src/components/`
 - Context providers for global state in `client/src/context/`
 - API client functions in `client/src/lib/api.ts`
+- INP file analyzer in `client/src/lib/inpAnalyzer.ts`
 
 ### Backend Architecture
 - **Runtime**: Node.js with Express
@@ -32,11 +33,15 @@ The frontend follows a component-based architecture with:
 - **File Uploads**: Multer middleware with in-memory storage
 
 Key API endpoints:
-- `GET /api/inp-files` - List all uploaded files
+- `GET /api/inp-files` - List all uploaded files (paginated)
 - `GET /api/inp-files/:id` - Get single file with content
-- `GET /api/inp-files/compare?file1=id&file2=id` - Compare two files (returns both contents)
+- `GET /api/inp-files/compare?file1=id&file2=id` - Compare two files
 - `POST /api/inp-files/upload` - Upload new `.inp` files
 - `DELETE /api/inp-files/:id` - Remove a file
+- `GET /api/stats` - Aggregate statistics (totals, averages, directory breakdown)
+- `GET /api/insights` - Database insights with distributions (pipe diameters, shapes, Manning's n, conduit lengths, offsets, model complexity). Samples up to 150 files, cached for 5 minutes.
+- `POST /api/load-samples` - Load bundled sample models into "Sample Models" directory
+- `POST /api/reswmm/apply` - Apply conduit discretization to a directory
 
 ### Data Storage
 - **Database**: PostgreSQL with Drizzle ORM
@@ -57,12 +62,31 @@ Object Storage:
 ### INP File Parser
 A custom parser (`server/inp-parser.ts`) extracts metadata from SWMM5 `.inp` files by reading section headers and counting elements in sections like JUNCTIONS, CONDUITS, SUBCATCHMENTS, etc.
 
+### INP File Analyzer (Client-Side)
+- **Location**: `client/src/lib/inpAnalyzer.ts`
+- **Purpose**: Deep structural analysis of .inp file content
+- **Features**: Section completeness grouped by 7 categories (Core Network, Geometry, Hydrology, Hydraulics, Water Quality, Green Infrastructure, Snow & Climate), connectivity checks, slope analysis, Manning's n validation, health scoring (0-100), actionable recommendations
+- **Percentile Comparison**: Compares analyzed model against all loaded models for nodes, links, subcatchments
+
+### Database Insights
+- **Page**: `client/src/pages/Insights.tsx` at `/insights`
+- **API**: `GET /api/insights` — samples up to 150 files from object storage, parses content for distributions
+- **Charts**: 6 interactive visualizations (pure CSS, no external charting library):
+  1. Pipe Diameter Distribution (histogram by inch sizes)
+  2. Cross-Section Shape Distribution (donut chart)
+  3. Manning's n Distribution (binned histogram)
+  4. Conduit Length Distribution (range bins)
+  5. Offset Patterns (inlet/outlet configurations)
+  6. Model Complexity (scatter plot: nodes vs links)
+- **Caching**: Server-side 5-minute TTL cache to avoid repeated object storage reads
+
 ### ReSWMM Conduit Discretization Engine
 - **Engine**: `server/reswmm.ts` — implements the ReSWMM algorithm (originally by Robson Leo Pachaly)
 - **Purpose**: Splits long conduits into shorter segments with intermediate junction nodes for better CFL stability
 - **Methods**: Fixed Interval (min/max length range) or Δx/D Ratio (segment length proportional to pipe diameter)
 - **API**: `POST /api/reswmm/apply` — applies discretization to all files in a directory, creating `_Disc.inp` output files
-- **Config**: Stored in browser localStorage, configurable via Settings page
+- **Page**: `client/src/pages/ReSWMM.tsx` at `/reswmm` (dedicated sidebar tab)
+- **Config**: Stored in browser localStorage, configurable via ReSWMM page
 - **Key parameters**: fixedMinLength, fixedMaxLength, dxDRatio, MNSA (Minimum Nodal Surface Area)
 - **Sections modified**: [TITLE], [JUNCTIONS], [CONDUITS], [XSECTIONS], [LOSSES], [COORDINATES]
 

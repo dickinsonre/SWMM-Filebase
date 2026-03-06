@@ -336,11 +336,11 @@ export default function Dashboard() {
               className="absolute inset-0 w-full h-full object-cover opacity-40 group-hover:scale-105 transition-transform duration-700"
             />
             <div className="absolute inset-0 z-20 flex flex-col justify-center px-4 sm:px-8">
-              <h1 className="text-xl sm:text-3xl font-bold text-white mb-1 sm:mb-2 tracking-tight" data-testid="text-page-title">SWMM 5 Miner</h1>
+              <h1 className="text-xl sm:text-3xl font-bold text-white mb-1 sm:mb-2 tracking-tight" data-testid="text-page-title">SWMM5 Model Intelligence</h1>
               <p className="text-blue-100 text-sm sm:text-base max-w-xl" data-testid="text-file-summary">
-                {files.length > 0 
-                  ? `${files.length} models across ${Object.keys(groupedFiles).length} directories`
-                  : "Mine, analyze, and visualize your SWMM5 .inp files"
+                {stats && stats.totalFiles > 0 
+                  ? `Insights from ${stats.totalFiles.toLocaleString()} models · ${(stats.totalNodes + stats.totalLinks + stats.totalSubcatchments).toLocaleString()} elements across ${stats.totalDirectories} directories`
+                  : "Mine, analyze, and compare SWMM5 models — upload your .inp files or load our sample library"
                 }
               </p>
             </div>
