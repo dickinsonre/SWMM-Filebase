@@ -6,7 +6,7 @@ import { InpFile, QuickAccessFile, ContentSearchResult, searchFileContent, getPi
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Search, Filter, SortAsc, Plus, Loader2, Pin, Clock, FileSearch, Download, X, Check, ArrowUp, ArrowDown, Activity, GitBranch, Database, FolderOpen, BarChart3, Map, BrainCircuit, GitCompare, Pickaxe, Scissors } from "lucide-react";
+import { Search, Filter, SortAsc, Plus, Loader2, Pin, Clock, FileSearch, Download, X, Check, ArrowUp, ArrowDown, Activity, GitBranch, Database, FolderOpen, BarChart3, Map, BrainCircuit, GitCompare, Pickaxe, Scissors, ChevronDown, ChevronRight } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "wouter";
 import { toast } from "@/hooks/use-toast";
@@ -63,6 +63,7 @@ export default function Dashboard() {
   const [stats, setStats] = useState<StatsData | null>(null);
   const [loadingSamples, setLoadingSamples] = useState(false);
   const [applyingReswmm, setApplyingReswmm] = useState<string | null>(null);
+  const [collapsedDirs, setCollapsedDirs] = useState<Set<string>>(new Set());
   const [filters, setFilters] = useState<FilterState>({
     minNodes: 0,
     maxNodes: Infinity,
@@ -741,51 +742,81 @@ export default function Dashboard() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3 }}
             >
-              <div className="flex items-center gap-2 mb-4">
+              <button
+                className="flex items-center gap-2 mb-4 w-full text-left group cursor-pointer"
+                onClick={() => setCollapsedDirs(prev => {
+                  const next = new Set(prev);
+                  next.has(directory) ? next.delete(directory) : next.add(directory);
+                  return next;
+                })}
+                data-testid={`toggle-dir-${directory}`}
+              >
+                {collapsedDirs.has(directory) ? (
+                  <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 transition-transform" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0 transition-transform" />
+                )}
                 <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-primary/60" />
                   {directory}
                 </h2>
+                <span className="text-xs text-muted-foreground/70 tabular-nums">
+                  ({groupedFiles[directory]?.length ?? 0})
+                </span>
                 <div className="h-px flex-1 bg-border/60" />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleApplyReswmm(directory)}
-                  disabled={applyingReswmm === directory}
-                  className="text-muted-foreground hover:text-foreground"
-                  data-testid={`reswmm-dir-${directory}`}
-                >
-                  {applyingReswmm === directory ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Scissors className="h-4 w-4" />
-                  )}
-                  <span className="ml-1 text-xs">ReSWMM</span>
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleExportDirectory(directory)}
-                  disabled={exportingDir === directory}
-                  className="text-muted-foreground hover:text-foreground"
-                  data-testid={`export-dir-${directory}`}
-                >
-                  {exportingDir === directory ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Download className="h-4 w-4" />
-                  )}
-                  <span className="ml-1 text-xs">Export</span>
-                </Button>
-              </div>
+                <span className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleApplyReswmm(directory)}
+                    disabled={applyingReswmm === directory}
+                    className="text-muted-foreground hover:text-foreground"
+                    data-testid={`reswmm-dir-${directory}`}
+                  >
+                    {applyingReswmm === directory ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Scissors className="h-4 w-4" />
+                    )}
+                    <span className="ml-1 text-xs">ReSWMM</span>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleExportDirectory(directory)}
+                    disabled={exportingDir === directory}
+                    className="text-muted-foreground hover:text-foreground"
+                    data-testid={`export-dir-${directory}`}
+                  >
+                    {exportingDir === directory ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Download className="h-4 w-4" />
+                    )}
+                    <span className="ml-1 text-xs">Export</span>
+                  </Button>
+                </span>
+              </button>
               
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-                {groupedFiles[directory]
-                  .filter(f => !searchQuery || directory.toLowerCase().includes(searchLower) || f.filename.toLowerCase().includes(searchLower))
-                  .map((file) => (
-                  <FileCard key={file.id} file={file} onPinChange={loadQuickAccess} />
-                ))}
-              </div>
+              <AnimatePresence initial={false}>
+                {!collapsedDirs.has(directory) && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+                      {groupedFiles[directory]
+                        .filter(f => !searchQuery || directory.toLowerCase().includes(searchLower) || f.filename.toLowerCase().includes(searchLower))
+                        .map((file) => (
+                        <FileCard key={file.id} file={file} onPinChange={loadQuickAccess} />
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </motion.div>
           ))}
 
