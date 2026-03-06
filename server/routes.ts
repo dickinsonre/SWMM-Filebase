@@ -181,11 +181,11 @@ export async function registerRoutes(
     try {
       const allFiles = req.files as Express.Multer.File[];
       const inpFiles = allFiles.filter(f => 
-        f.originalname.toLowerCase().endsWith('.inp')
+        f.originalname.toLowerCase().endsWith('.inp') || f.originalname.toLowerCase().endsWith('.xp')
       );
       
       if (!inpFiles || inpFiles.length === 0) {
-        return res.status(400).json({ error: 'No .inp files found in upload' });
+        return res.status(400).json({ error: 'No .inp or .xp files found in upload' });
       }
 
       const createdFiles = [];

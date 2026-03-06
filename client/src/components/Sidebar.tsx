@@ -71,12 +71,12 @@ export function SidebarContent({ onNavigate }: SidebarContentProps) {
   const uniqueDirectories = Object.keys(directoryCounts);
 
   const handleFileUpload = async (fileList: FileList, source: 'file' | 'directory') => {
-    const inpFiles = Array.from(fileList).filter(f => f.name.toLowerCase().endsWith('.inp'));
+    const inpFiles = Array.from(fileList).filter(f => f.name.toLowerCase().endsWith('.inp') || f.name.toLowerCase().endsWith('.xp'));
     
     if (inpFiles.length === 0) {
       toast({
-        title: "No .inp files found",
-        description: "Please select valid SWMM5 .inp files.",
+        title: "No model files found",
+        description: "Please select valid .inp or .xp files.",
         variant: "destructive"
       });
       return;
@@ -119,12 +119,12 @@ export function SidebarContent({ onNavigate }: SidebarContentProps) {
 
   const handleDirectoryImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      const inpFiles = Array.from(e.target.files).filter(f => f.name.toLowerCase().endsWith('.inp'));
+      const inpFiles = Array.from(e.target.files).filter(f => f.name.toLowerCase().endsWith('.inp') || f.name.toLowerCase().endsWith('.xp'));
       
       if (inpFiles.length === 0) {
         toast({
-          title: "No .inp files found",
-          description: "The selected folder contains no SWMM5 .inp files.",
+          title: "No model files found",
+          description: "The selected folder contains no .inp or .xp files.",
           variant: "destructive"
         });
         e.target.value = '';
@@ -304,7 +304,7 @@ export function SidebarContent({ onNavigate }: SidebarContentProps) {
           type="file" 
           ref={fileInputRef} 
           className="hidden" 
-          accept=".inp" 
+          accept=".inp,.xp" 
           multiple
           onChange={handleFileImport} 
         />
