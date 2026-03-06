@@ -190,12 +190,21 @@ export async function registerRoutes(
 
       const createdFiles = [];
       const failedFiles: { filename: string; error: string }[] = [];
+      const skippedFiles: { filename: string }[] = [];
+      const directory = req.body.directory || 'Imported Files';
+
+      const existingFiles = await storage.getInpFilesByDirectory(directory);
+      const existingNames = new Set(existingFiles.map(f => f.filename));
 
       for (const file of inpFiles) {
         try {
+          if (existingNames.has(file.originalname)) {
+            skippedFiles.push({ filename: file.originalname });
+            continue;
+          }
+
           const content = file.buffer.toString('utf-8');
           const metadata = parseInpFile(content);
-          const directory = req.body.directory || 'Imported Files';
 
           const objectPath = await objectStorageService.uploadInpFile(content, file.originalname);
 
@@ -235,7 +244,9 @@ export async function registerRoutes(
         files: createdFiles, 
         count: createdFiles.length,
         failed: failedFiles,
-        failedCount: failedFiles.length
+        failedCount: failedFiles.length,
+        skipped: skippedFiles,
+        skippedCount: skippedFiles.length
       });
     } catch (error) {
       console.error('Error uploading files:', error);

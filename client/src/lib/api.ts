@@ -109,6 +109,8 @@ export interface UploadResult {
   count: number;
   failed: { filename: string; error: string }[];
   failedCount: number;
+  skipped: { filename: string }[];
+  skippedCount: number;
 }
 
 export async function uploadInpFiles(files: File[], directory?: string): Promise<UploadResult> {

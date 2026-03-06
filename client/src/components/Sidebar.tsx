@@ -96,18 +96,16 @@ export function SidebarContent({ onNavigate }: SidebarContentProps) {
       const result = await uploadFiles(inpFiles, directory);
       setUploadProgress({ current: inpFiles.length, total: inpFiles.length });
       
-      if (result.failedCount > 0) {
-        toast({
-          title: `Imported ${result.count} file${result.count !== 1 ? 's' : ''}`,
-          description: `${result.failedCount} file${result.failedCount !== 1 ? 's' : ''} failed: ${result.failed.map(f => f.filename).join(', ')}`,
-          variant: result.count > 0 ? "default" : "destructive"
-        });
-      } else {
-        toast({
-          title: "Import Successful",
-          description: `Uploaded ${result.count} file${result.count !== 1 ? 's' : ''}`,
-        });
-      }
+      const parts: string[] = [];
+      if (result.count > 0) parts.push(`${result.count} imported`);
+      if (result.skippedCount > 0) parts.push(`${result.skippedCount} duplicate${result.skippedCount !== 1 ? 's' : ''} skipped`);
+      if (result.failedCount > 0) parts.push(`${result.failedCount} failed`);
+
+      toast({
+        title: result.count > 0 ? "Import Successful" : (result.skippedCount > 0 ? "All Duplicates" : "Import Failed"),
+        description: parts.join(', '),
+        variant: result.count > 0 ? "default" : (result.skippedCount > 0 ? "default" : "destructive")
+      });
     } catch (error) {
       toast({
         title: "Upload Failed",
@@ -169,18 +167,16 @@ export function SidebarContent({ onNavigate }: SidebarContentProps) {
       const result = await uploadFiles(filesToUpload, pendingDirectory);
       setUploadProgress({ current: filesToUpload.length, total: filesToUpload.length });
       
-      if (result.failedCount > 0) {
-        toast({
-          title: `Imported ${result.count} file${result.count !== 1 ? 's' : ''}`,
-          description: `${result.failedCount} file${result.failedCount !== 1 ? 's' : ''} failed`,
-          variant: result.count > 0 ? "default" : "destructive"
-        });
-      } else {
-        toast({
-          title: "Import Successful",
-          description: `Uploaded ${result.count} file${result.count !== 1 ? 's' : ''}`,
-        });
-      }
+      const parts: string[] = [];
+      if (result.count > 0) parts.push(`${result.count} imported`);
+      if (result.skippedCount > 0) parts.push(`${result.skippedCount} duplicate${result.skippedCount !== 1 ? 's' : ''} skipped`);
+      if (result.failedCount > 0) parts.push(`${result.failedCount} failed`);
+
+      toast({
+        title: result.count > 0 ? "Import Successful" : (result.skippedCount > 0 ? "All Duplicates" : "Import Failed"),
+        description: parts.join(', '),
+        variant: result.count > 0 ? "default" : (result.skippedCount > 0 ? "default" : "destructive")
+      });
     } catch (error) {
       toast({
         title: "Upload Failed",
