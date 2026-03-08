@@ -662,3 +662,300 @@ FileCard dropdown includes links to related SWMM tools (opened in new tabs):
 | File Formats         | .inp and .xp         |
 | Largest File         | ~24.7 MB             |
 | Smallest File        | ~3 KB                |
+
+---
+
+## 20. Grading & Scoring Breakdown
+
+**Overall Grade: A / 92 out of 100**
+
+```
+Content & Data                ██████████  97
+  1,000+ models, 18 directories, 220K nodes, 226K links, 70K subcatchments
+  .inp AND .xp format support
+
+Core Functionality            █████████░  95
+  18 REST API endpoints, full CRUD with duplicate detection
+  Content search with line-number highlighting, ZIP export via Archiver
+
+Analysis & Intelligence       █████████░  93
+  AI health scoring (0-100), batch analysis across all models
+  7-category section completeness, slope/connectivity/Manning's n validation
+
+Statistical Insights          █████████░  94
+  6 interactive charts (pure CSS), ALL files analyzed (no sampling limit)
+  5-minute server-side cache
+
+Visualization                 █████████░  90
+  SVG network maps with zoom/pan, Minecraft-style voxel maps (multiple biomes)
+
+Model Comparison              █████████░  91
+  Section-aware diff with highlighting, markdown report export
+
+Architecture                  █████████░  92
+  PostgreSQL + Drizzle ORM, Replit Object Storage (GCS)
+  Proper file/metadata separation, anti-flash theme script
+
+Ecosystem Integration         ████████░░  82
+  Links to Engine, INP MAKER, BatchSWMM — but no deep data flow between apps
+
+UI / UX                       █████████░  88
+  4 color themes + dark mode, collapsible directories
+  Pin/recent quick access, responsive with mobile sidebar
+```
+
+---
+
+## 21. Improvement Ideas (10 Features to Reach A+)
+
+### Idea 1: "Model Timeline" — Track Changes Over Time
+
+**Concept**: When users upload multiple versions of the same model, show how it evolved over time.
+
+**What it does**:
+- Detects version groups by filename similarity (strips `_v1`, `_rev2`, `_20240315` suffixes)
+- Shows timeline with node/link/subcatchment counts at each version
+- Auto-diffs between consecutive versions
+- Health score trend chart showing improvement over time
+- "What changed" summary (e.g., "+44 new junctions, +5 LID controls, health: 68 → 82")
+
+**Implementation approach**:
+- Group files by base name (strip version/date suffixes)
+- Sort each group by `createdAt` date
+- For each version group, compute deltas between consecutive versions
+- New page or Dashboard section: clickable timeline with compare links
+
+**Effort**: ~2 weeks | **Impact**: +2 points
+
+---
+
+### Idea 2: "Smart Recommendations" — AI-Powered Auto-Fix
+
+**Concept**: After AI Analysis identifies issues, generate SPECIFIC actionable recommendations with "Fix It" buttons that modify the file content directly.
+
+**Current behavior**: "12 conduits have adverse slopes" (just a count)
+
+**Improved behavior**:
+- Lists each problematic element by name with exact values
+- Shows what the fix would be (e.g., "Swap upstream/downstream inverts")
+- "Auto-Fix All" buttons that modify file content directly
+- Estimated health score improvement after all fixes (e.g., "72 → 89, +17 points")
+
+**Auto-fix examples**:
+- **Adverse slopes**: Swap upstream/downstream node inverts
+- **Orphan nodes**: Remove disconnected nodes or auto-connect to nearest downstream
+- **High Manning's n**: Suggest standard values based on pipe material
+- **Missing sections**: Generate template sections via INP MAKER integration
+
+**Effort**: ~2 weeks | **Impact**: +2 points
+
+---
+
+### Idea 3: "Model Quality Leaderboard" — Gamified Health Tracking
+
+**Concept**: Rank all 1,000+ models by health score with directory-level averages.
+
+**What it shows**:
+- Top 10 healthiest models with score bars
+- Bottom 10 models needing attention
+- Directory rankings by average health score
+- Overall library health score
+- Health distribution chart
+- CSV export of rankings
+
+**Implementation approach**:
+- Add `health_score INTEGER` column to `inp_files` table
+- Store score after each AI analysis run
+- Leaderboard page queries: `ORDER BY health_score DESC`
+- Directory averages: `GROUP BY directory, AVG(health_score)`
+
+**Effort**: ~2 weeks | **Impact**: +1 point
+
+---
+
+### Idea 4: "Cross-Model Pattern Search"
+
+**Concept**: Search for specific engineering PATTERNS across all 1,000+ models, not just text.
+
+**What it does**:
+- Filter models by characteristics: "Has pumps AND uses Green-Ampt AND more than 100 conduits"
+- Shows common patterns across matching models (e.g., "89% use DYNWAVE routing")
+- Preset searches: "Models with LID", "Models with pumps", "Combined sewers", "Large models (>500 nodes)"
+
+**Implementation approach**:
+- Build a structured search index from parsed file content per model:
+  - `hasPumps`, `hasLID`, `hasWQ`, `hasSnow` (boolean flags from section presence)
+  - `routing`, `infiltration`, `flowUnits` (extracted from [OPTIONS] section)
+  - `nodeCount`, `linkCount` (already in DB)
+- Store index in a new table or JSON column
+- Query with combinable filters
+
+**Effort**: ~1-2 weeks | **Impact**: +2 points
+
+---
+
+### Idea 5: "Ecosystem Data Flow" — Send Models to Other Apps
+
+**Concept**: Replace simple external links with actual data transfer to other SWMM apps.
+
+**Current**: FileCard dropdown has links to Engine, INP MAKER, BatchSWMM — but they're just URLs with no data transfer.
+
+**Improved**:
+- "Open in SWMM5 Engine" → opens Engine and sends model content via `window.postMessage`
+- "Enhance in INP MAKER" → opens INP MAKER with model pre-loaded
+- "Run in BatchSWMM" → sends multiple selected files for batch simulation
+
+**New ecosystem actions**:
+- "Get Rainfall" → Open Rain Canvas with model's geographic location
+- "See Algorithms" → Open Rosetta Stone for relevant SWMM modules
+- "Analyze Repository" → Open Repo Insights for pyswmm
+- "Compare with SWMManywhere" → Generate model for same area
+
+**Effort**: ~1-2 days per app connection | **Impact**: +2 points
+
+---
+
+### Idea 6: "Model Similarity Finder"
+
+**Concept**: Select any model → find the most similar models in the 1,000+ library.
+
+**Similarity dimensions**:
+- **Size**: node/link/subcatchment count comparison
+- **Type**: sections present (LID, WQ, Snow, pumps, etc.)
+- **Complexity**: links/node ratio, max pipe diameter
+- **Parameters**: Manning's n distribution, slope patterns
+- **Structure**: cross-section shape distribution, offset patterns
+
+**Implementation approach**:
+- Compute similarity score (0-100%) using weighted normalized distances
+- `sizeSim = 1 - |countA - countB| / max(countA, countB)`
+- `sectionSim = jaccard(sectionsA, sectionsB)`
+- Weighted average: 30% size + 30% links + 20% sections + 20% complexity
+- "Compare Side-by-Side" link for each similar model
+
+**Effort**: ~1-2 weeks | **Impact**: +1 point
+
+---
+
+### Idea 7: Enhanced Minecraft Maps — Interactive Voxel World
+
+**Concept**: The app already has unique Minecraft-style voxel maps. Enhance them into a full interactive experience.
+
+**Enhancements**:
+- Click interactions on nodes/pipes (popup with properties: depth, elevation, diameter, length, slope)
+- Pipe thickness proportional to actual diameter (visual scaling)
+- Color coding options: by diameter, slope, Manning's n, or flow direction
+- New "Neon" cyberpunk theme (dark background, glowing pipes)
+- Export as high-res PNG for engineering reports
+- 3D isometric view option
+- Rotate view button
+
+**Effort**: ~1-2 weeks | **Impact**: +1 point (most unique visualization in any SWMM tool)
+
+---
+
+### Idea 8: "Batch ReSWMM with Results Comparison"
+
+**Concept**: After ReSWMM creates `_Disc.inp` files, automatically run both original and discretized through SWMM simulation and show the improvement.
+
+**What it shows**:
+- Table: Model name | Original Continuity Error | Discretized CE | Delta %
+- Average CE improvement across all models
+- Count of models brought below 1% CE threshold
+- Before/after comparison chart
+- Download all discretized models as ZIP
+
+**Implementation approach**:
+- After ReSWMM creates `_Disc.inp` files, send both original and discretized to external SWMM engine (`POST /api/simulate/:id` already exists)
+- Parse continuity errors from both `.rpt` outputs
+- Display comparison table with color-coded improvements
+
+**Effort**: ~1-2 weeks | **Impact**: +2 points
+
+---
+
+### Idea 9: "Model Usage Analytics"
+
+**Concept**: Track which models are viewed, analyzed, compared, and downloaded most. Show trends over time.
+
+**What it shows**:
+- Most viewed models (last 30 days)
+- Most analyzed models
+- Most compared model pairs
+- Most downloaded models
+- Daily activity sparkline chart
+
+**Implementation approach**:
+- New database table: `model_events (id, file_id, event_type, created_at)`
+- Event types: `view`, `analyze`, `compare`, `download`, `simulate`
+- Log events at each relevant API call
+- Aggregate queries for analytics dashboard
+- Already tracking `lastAccessedAt` — extend with full event history
+
+**Effort**: ~1-2 weeks | **Impact**: +1 point
+
+---
+
+### Idea 10: "WASM Simulation Dashboard"
+
+**Concept**: Run SWMM via WebAssembly in the browser for instant model validation without needing the server.
+
+**What it does**:
+- Quick 1-hour simulation runs entirely in browser (2-3 seconds)
+- Results: status, routing CE, runoff CE, warnings, flooding nodes, peak outfall flow
+- "View Full Report" for detailed simulation output
+- "Fix Issues & Re-Run" workflow
+- Batch validation: "Validate All with WASM" runs quick sim on every model
+- Model cards show validation badge: Validated / Warnings / Failed
+
+**Note**: `client/src/lib/swmmEngine.ts` already exists for WebAssembly SWMM integration.
+
+**Effort**: ~2-3 weeks | **Impact**: +2 points
+
+---
+
+## 22. Priority Ranking for Improvements
+
+### Fastest to Implement
+| Priority | Feature                          | Effort     | Impact  |
+|:---------|:---------------------------------|:-----------|:--------|
+| 1        | Ecosystem Data Flow (#5)         | 1-2 days   | +2 pts  |
+| 2        | Model Quality Leaderboard (#3)   | 2 weeks    | +1 pt   |
+| 3        | Usage Analytics (#9)             | 1-2 weeks  | +1 pt   |
+
+### Highest Value
+| Priority | Feature                          | Effort     | Impact  |
+|:---------|:---------------------------------|:-----------|:--------|
+| 4        | Smart Recommendations (#2)       | 2 weeks    | +2 pts  |
+| 5        | Cross-Model Pattern Search (#4)  | 1-2 weeks  | +2 pts  |
+| 6        | Batch ReSWMM Comparison (#8)     | 1-2 weeks  | +2 pts  |
+| 7        | Model Timeline (#1)              | 2 weeks    | +2 pts  |
+
+### Unique / Fun
+| Priority | Feature                          | Effort     | Impact  |
+|:---------|:---------------------------------|:-----------|:--------|
+| 8        | Minecraft Map Enhancements (#7)  | 1-2 weeks  | +1 pt   |
+| 9        | Model Similarity Finder (#6)     | 1-2 weeks  | +1 pt   |
+| 10       | WASM Simulation Dashboard (#10)  | 2-3 weeks  | +2 pts  |
+
+### Fast Path to A+ (96+)
+Ecosystem Flow + Smart Recommendations + Pattern Search + Leaderboard = ~5-6 weeks → +7 points → 99
+
+---
+
+## 23. Suite Rankings (Current Standing)
+
+```
+ #1   SWMM5 Rosetta Stone          A+ (100)
+ #2   SWMM5 INP MAKER              A+ (97)
+ #3   Rain Canvas Studio            A  (94)
+ #4   Repo Insights                 A  (93)
+ #5   SWMM5 Simulation Engine       A  (93)
+ #6   SWMM5 Network Miner          A  (92)  ← Current
+ #7   BobSWMM (MEL)                A- (91)
+ #8   SWMM Docs Archive            A- (90)
+ #9   SWMManywhere Explorer          A- (89)
+ #10  HydroCouple Explorer          A- (89)
+ #11  BatchSWMM                     A- (88)
+ #12  PySWMM Explorer               B+ (87)
+```
