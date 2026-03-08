@@ -1,119 +1,63 @@
 # SWMM5 Network Miner
 
 ## Overview
-
-SWMM5 Network Miner is a web application for mining, analyzing, and visualizing SWMM5 (Storm Water Management Model) `.inp` files with Minecraft-style map visualizations. The application allows users to upload, view, and organize stormwater modeling files with AI-powered analysis capabilities. It parses `.inp` files to extract metadata like node counts, link counts, and subcatchment counts, storing both the metadata and file content in a PostgreSQL database.
+SWMM5 Network Miner is a full-stack web application designed for comprehensive management, analysis, and visualization of SWMM5 (`.inp`) and XPSWMM (`.xp`) stormwater model files. Its core purpose is to provide a central platform for engineers and urban planners to interact with stormwater models, offering functionalities like file upload, directory-based organization, advanced structural analysis, AI-powered health diagnostics, side-by-side model comparison, and interactive visualizations. The application aims to streamline the workflow for managing large libraries of stormwater models, enhance understanding through rich data representation, and improve model quality through automated analysis and discretization tools. With capabilities to parse, store, and analyze thousands of models, it serves as a critical tool for detailed structural analysis and insights into stormwater network performance and design.
 
 ## User Preferences
-
-Preferred communication style: Simple, everyday language.
+- Preferred communication style: Simple, everyday language.
+- App name must always be "SWMM5 Network Miner" (not "SWMM 5 Miner" or "SWMM5 Miner").
+- Supports both `.inp` (SWMM5) and `.xp` (XPSWMM) file formats.
 
 ## System Architecture
 
 ### Frontend Architecture
-- **Framework**: React with TypeScript
-- **Routing**: Wouter (lightweight React router)
-- **State Management**: React Context API for file state, TanStack Query for server state
-- **UI Components**: shadcn/ui component library built on Radix UI primitives
-- **Styling**: Tailwind CSS with custom theme configuration
-- **Animations**: Framer Motion for UI animations
-- **Build Tool**: Vite
-
-The frontend follows a component-based architecture with:
-- Pages in `client/src/pages/` (Dashboard, CompareModels, AIAnalysis, Insights, ReSWMM, Settings, NotFound)
-- Reusable components in `client/src/components/`
-- Context providers for global state in `client/src/context/`
-- API client functions in `client/src/lib/api.ts`
-- INP file analyzer in `client/src/lib/inpAnalyzer.ts`
+- **Framework**: React 19 with TypeScript.
+- **Routing**: Wouter.
+- **State Management**: React Context (`FileContext`, `ThemeContext`) for global states, TanStack Query for server state caching.
+- **UI Components**: shadcn/ui library built on Radix UI primitives.
+- **Styling**: Tailwind CSS v4 with custom themes and CSS variables.
+- **Animations**: Framer Motion for transitions.
+- **Build Tool**: Vite.
+- **UI/UX Decisions**:
+    - **Dashboard**: Features a stats bar, quick access for pinned/recent files, filename/content search, filters by node/link counts and directories, and sorting options.
+    - **FileCard**: Displays metadata, content viewer/editor, standard SVG and Minecraft-style voxel map visualizations, and external app integrations.
+    - **Compare Models**: Side-by-side visual diff for two selected files.
+    - **AI Analysis**: Health score (0-100) based on structural checks, categorized issues (Errors, Warnings, Info), section completeness, and percentile comparisons.
+    - **Insights**: Six interactive, pure CSS visualizations for pipe diameter, cross-section shape, Manning's n, conduit length, offset patterns, and model complexity.
+    - **ReSWMM**: Configuration for conduit discretization methods (Fixed Interval, Dx/D Ratio).
+    - **Settings**: Dark mode toggle and multiple color themes (EPA, UF, Oregon State, Auburn) with live previews, persisted in local storage.
+    - **Theme System**: Dynamic CSS class application to `document.documentElement` (`.theme-epa`, `.dark.theme-epa`, etc.) with an anti-flash inline script.
 
 ### Backend Architecture
-- **Runtime**: Node.js with Express
-- **Language**: TypeScript (compiled with tsx for development, esbuild for production)
-- **API Pattern**: RESTful API with JSON responses
-- **File Uploads**: Multer middleware with in-memory storage
-
-Key API endpoints:
-- `GET /api/inp-files` - List all uploaded files (paginated)
-- `GET /api/inp-files/:id` - Get single file with content
-- `GET /api/inp-files/compare?file1=id&file2=id` - Compare two files
-- `POST /api/inp-files/upload` - Upload new `.inp` files
-- `DELETE /api/inp-files/:id` - Remove a file
-- `GET /api/stats` - Aggregate statistics (totals, averages, directory breakdown)
-- `GET /api/insights` - Database insights with distributions (pipe diameters, shapes, Manning's n, conduit lengths, offsets, model complexity). Samples up to 150 files, cached for 5 minutes.
-- `POST /api/load-samples` - Load bundled sample models into "Sample Models" directory
-- `POST /api/reswmm/apply` - Apply conduit discretization to a directory
+- **Runtime**: Node.js with Express.
+- **Language**: TypeScript.
+- **API Pattern**: RESTful API with JSON responses.
+- **File Uploads**: Multer middleware supporting `.inp` and `.xp` files, with server-side duplicate detection based on filename and directory.
+- **INP Parser**: Extracts metadata (node, link, subcatchment counts) from `.inp` files by analyzing section headers and data lines.
+- **ReSWMM Engine**: Integrates a conduit discretization engine to split long conduits, modifying various sections of the INP file.
 
 ### Data Storage
-- **Database**: PostgreSQL with Drizzle ORM
-- **Object Storage**: Replit Object Storage (Google Cloud Storage backend) for raw .inp file content
-- **Schema Location**: `shared/schema.ts`
-- **Migrations**: Drizzle Kit (`drizzle-kit push`)
-
-Database tables:
-- `users` - Basic user authentication (id, username, password)
-- `inp_files` - SWMM5 file metadata (filename, directory, counts, objectPath reference)
-
-Object Storage:
-- Raw .inp file content stored in Replit Object Storage bucket
-- Files stored at path: `/objects/inp-files/<uuid>-<filename>`
-- Object storage service: `server/objectStorage.ts`
-- ACL policies: `server/objectAcl.ts`
-
-### INP File Parser
-A custom parser (`server/inp-parser.ts`) extracts metadata from SWMM5 `.inp` files by reading section headers and counting elements in sections like JUNCTIONS, CONDUITS, SUBCATCHMENTS, etc.
-
-### INP File Analyzer (Client-Side)
-- **Location**: `client/src/lib/inpAnalyzer.ts`
-- **Purpose**: Deep structural analysis of .inp file content
-- **Features**: Section completeness grouped by 7 categories (Core Network, Geometry, Hydrology, Hydraulics, Water Quality, Green Infrastructure, Snow & Climate), connectivity checks, slope analysis, Manning's n validation, health scoring (0-100), actionable recommendations
-- **Percentile Comparison**: Compares analyzed model against all loaded models for nodes, links, subcatchments
-
-### Database Insights
-- **Page**: `client/src/pages/Insights.tsx` at `/insights`
-- **API**: `GET /api/insights` — samples up to 150 files from object storage, parses content for distributions
-- **Charts**: 6 interactive visualizations (pure CSS, no external charting library):
-  1. Pipe Diameter Distribution (histogram by inch sizes)
-  2. Cross-Section Shape Distribution (donut chart)
-  3. Manning's n Distribution (binned histogram)
-  4. Conduit Length Distribution (range bins)
-  5. Offset Patterns (inlet/outlet configurations)
-  6. Model Complexity (scatter plot: nodes vs links)
-- **Caching**: Server-side 5-minute TTL cache to avoid repeated object storage reads
-
-### ReSWMM Conduit Discretization Engine
-- **Engine**: `server/reswmm.ts` — implements the ReSWMM algorithm (originally by Robson Leo Pachaly)
-- **Purpose**: Splits long conduits into shorter segments with intermediate junction nodes for better CFL stability
-- **Methods**: Fixed Interval (min/max length range) or Δx/D Ratio (segment length proportional to pipe diameter)
-- **API**: `POST /api/reswmm/apply` — applies discretization to all files in a directory, creating `_Disc.inp` output files
-- **Page**: `client/src/pages/ReSWMM.tsx` at `/reswmm` (dedicated sidebar tab)
-- **Config**: Stored in browser localStorage, configurable via ReSWMM page
-- **Key parameters**: fixedMinLength, fixedMaxLength, dxDRatio, MNSA (Minimum Nodal Surface Area)
-- **Sections modified**: [TITLE], [JUNCTIONS], [CONDUITS], [XSECTIONS], [LOSSES], [COORDINATES]
-
-### Build System
-- Development: Vite dev server with HMR for frontend, tsx watch for backend
-- Production: Custom build script that uses Vite for frontend and esbuild for backend bundling
-- Static files served from `dist/public` in production
+- **Database**: PostgreSQL with Drizzle ORM for metadata.
+- **Object Storage**: Replit Object Storage (Google Cloud Storage backend) for raw `.inp` and `.xp` file content.
+- **Schema**: Defined in `shared/schema.ts` using Drizzle ORM.
 
 ## External Dependencies
 
-### Database
-- **PostgreSQL**: Primary database, connection via `DATABASE_URL` environment variable
-- **Drizzle ORM**: Type-safe database queries and schema management
-- **connect-pg-simple**: Session storage (available but not currently in active use)
+### Core
+- **PostgreSQL**: Primary relational database.
+- **Drizzle ORM**: Type-safe ORM for database interactions.
+- **Replit Object Storage**: Cloud-based storage for raw model files.
 
-### Frontend Libraries
-- **@tanstack/react-query**: Server state management and caching
-- **Radix UI**: Accessible UI primitives (dialog, dropdown, tabs, etc.)
-- **Framer Motion**: Animation library
-- **Lucide React**: Icon library
+### Frontend
+- **React**: UI library.
+- **Wouter**: Client-side router.
+- **@tanstack/react-query**: Server state management.
+- **Radix UI**: Accessible UI component primitives.
+- **Framer Motion**: Animation library.
+- **Lucide React**: Icon library.
+- **Tailwind CSS**: Utility-first CSS framework.
 
-### Development Tools
-- **Vite**: Frontend build tool with React plugin
-- **Tailwind CSS v4**: Utility-first CSS framework
-- **TypeScript**: Type checking across the entire codebase
-
-### Replit-Specific
-- **@replit/vite-plugin-runtime-error-modal**: Error overlay for development
-- **@replit/vite-plugin-cartographer**: Development tooling
-- **@replit/vite-plugin-dev-banner**: Development environment indicator
+### Backend
+- **Express**: Web application framework.
+- **Multer**: Middleware for handling `multipart/form-data`.
+- **Archiver**: Library for creating `.zip` archives.
