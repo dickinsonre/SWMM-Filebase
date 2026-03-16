@@ -1,689 +1,1061 @@
-# SWMM5 Network Miner — Handover Document
+# SWMM5 Network Miner — Complete Handover Document
 
 ## 1. Overview
 
-SWMM5 Network Miner is a full-stack web application for mining, analyzing, and visualizing SWMM5 (`.inp`) and XPSWMM (`.xp`) stormwater model files. It serves as the central hub for managing stormwater model libraries with features including file upload/import, directory-based organization, Minecraft-style voxel map visualization, AI-powered health analysis, side-by-side model comparison, aggregate statistical insights, ReSWMM conduit discretization, and SWMM simulation integration.
+SWMM5 Network Miner is a full-stack web application for mining, analyzing, and visualizing SWMM5 (`.inp`) and XPSWMM (`.xp`) stormwater model files. It serves as a central platform for engineers and urban planners to upload, organize, search, compare, analyze, visualize, and discretize stormwater models — all from a single web interface.
 
-The app parses model files to extract metadata (node counts, link counts, subcatchment counts), stores metadata in PostgreSQL and raw file content in Replit Object Storage, and provides tools for deep structural analysis across an entire model library.
+The app parses model files to extract metadata (node counts, link counts, subcatchment counts), stores metadata in PostgreSQL and raw file content in Replit Object Storage (Google Cloud Storage), and provides deep structural analysis, AI-powered health scoring, aggregate statistical insights, side-by-side model comparison with diff views, Minecraft-style voxel map visualization, and ReSWMM conduit discretization.
 
-**Current state**: 1,000+ models loaded across 18+ directories with full import/export, analysis, and visualization capabilities.
-
-**Important**: The app name must always be "SWMM5 Network Miner" — not "SWMM 5 Miner" or "SWMM5 Miner".
-
----
-
-## 2. Codebase Statistics
-
-| Metric                   | Value                                    |
-|:--------------------------|:-----------------------------------------|
-| Total TypeScript LOC      | ~15,500 lines across all `.ts`/`.tsx`    |
-| Backend (`server/`)       | ~1,842 lines (routes: 820, storage: 235, reswmm: 598, parser: 189) |
-| Frontend Pages            | ~2,864 lines (Dashboard: 927, AIAnalysis: 612, ReSWMM: 387, CompareModels: 385, Insights: 355, Settings: 177, 404: 21) |
-| Frontend Components       | ~2,508 lines (MinecraftMap: 1,136, Sidebar: 566, FileCard: 555, MapVisualization: 251) |
-| Frontend Context/Hooks    | ~164 lines (FileContext: 93, ThemeContext: 71) |
-| Frontend Lib              | ~949 lines (inpAnalyzer: 302, swmmEngine: 290, api: 274, diff: 220, queryClient: 57, mock-data: 76, utils: 6) |
-| UI Components (shadcn)    | ~30 components in `client/src/components/ui/` |
-| Bundled Sample Models     | 5 `.inp` files in `server/samples/`      |
-| Fonts                     | Inter + JetBrains Mono (Google Fonts CDN)|
+**Current state**: 1,000+ models loaded across 18+ directories.  
+**Important**: The app name must always be "SWMM5 Network Miner" — never "SWMM 5 Miner" or "SWMM5 Miner".
 
 ---
 
-## 3. Project Structure
+## 2. Codebase Metrics
+
+| Metric                       | Value                                                     |
+|:-----------------------------|:----------------------------------------------------------|
+| Total TypeScript LOC         | ~15,500 lines across all `.ts`/`.tsx` files               |
+| Backend (`server/`)          | ~1,842 lines (routes: 821, reswmm: 598, storage: 236, parser: 189) |
+| Frontend Pages               | ~2,865 lines across 7 page components                    |
+| Frontend Components          | ~2,508 lines across 4 core components + ~30 UI components|
+| Frontend Context + Hooks     | ~164 lines (FileContext: 93, ThemeContext: 71)            |
+| Frontend Libraries           | ~949 lines across 7 lib modules                          |
+| Shared Schema                | 43 lines                                                 |
+| Bundled Sample Models        | 5 `.inp` files in `server/samples/`                      |
+| Fonts                        | Inter (UI) + JetBrains Mono (code/data) via Google Fonts |
+
+---
+
+## 3. Project File Structure
 
 ```
 .
-├── client/                          # Frontend (React + Vite)
-│   ├── index.html                   # HTML shell with anti-flash theme script in <head>
-│   ├── public/                      # Static assets (favicon.png, etc.)
+├── client/                          # Frontend (React 19 + Vite)
+│   ├── index.html                   # HTML shell — anti-flash theme script runs before CSS loads
+│   ├── public/                      # Static assets (favicon.png)
 │   └── src/
-│       ├── main.tsx                 # React entry point, mounts <App />
+│       ├── main.tsx                 # React entry: ReactDOM.createRoot → <App />
 │       ├── App.tsx                  # Root: QueryClientProvider → ThemeProvider → FileProvider → Router
-│       ├── index.css                # Global styles, all theme CSS variables, dark mode rules
-│       ├── pages/
-│       │   ├── Dashboard.tsx        # Main page: stats bar, search, filters, collapsible dirs (927 LOC)
-│       │   ├── AIAnalysis.tsx       # Health scoring, batch analysis, issue categorization (612 LOC)
-│       │   ├── CompareModels.tsx    # Side-by-side model diff with markdown report export (385 LOC)
-│       │   ├── Insights.tsx         # 6 statistical chart visualizations, pure CSS (355 LOC)
-│       │   ├── ReSWMM.tsx           # Conduit discretization config page (387 LOC)
-│       │   ├── Settings.tsx         # Dark mode toggle + color theme picker (177 LOC)
-│       │   └── not-found.tsx        # 404 page (21 LOC)
+│       ├── index.css                # Global CSS: all theme variables, dark mode, utility classes
+│       │
+│       ├── pages/                   # One component per route
+│       │   ├── Dashboard.tsx        # 928 LOC — main file browser, stats, search, filters, dirs
+│       │   ├── AIAnalysis.tsx       # 613 LOC — health scoring, batch analysis, percentiles
+│       │   ├── ReSWMM.tsx           # 388 LOC — discretization config, per-directory apply
+│       │   ├── CompareModels.tsx    # 386 LOC — side-by-side diff, markdown report export
+│       │   ├── Insights.tsx         # 355 LOC — 6 pure-CSS statistical charts
+│       │   ├── Settings.tsx         # 177 LOC — dark mode, color themes, notifications
+│       │   └── not-found.tsx        # 21 LOC  — 404 page
+│       │
 │       ├── components/
-│       │   ├── MinecraftMap.tsx     # Voxel-style Minecraft map, multiple biome themes (1,136 LOC)
-│       │   ├── Sidebar.tsx          # Navigation + file/directory upload + mobile responsive (566 LOC)
-│       │   ├── FileCard.tsx         # Individual model card: metadata, viewer, maps, actions (555 LOC)
-│       │   ├── MapVisualization.tsx  # SVG-based network map renderer with zoom/pan (251 LOC)
-│       │   └── ui/                  # shadcn/ui component library (~30 components)
+│       │   ├── MinecraftMap.tsx     # 1,136 LOC — voxel-style map with multiple biome themes
+│       │   ├── Sidebar.tsx          # 567 LOC  — nav, uploads, directory import dialog
+│       │   ├── FileCard.tsx         # 556 LOC  — model card: metadata, editor, maps, actions
+│       │   ├── MapVisualization.tsx  # 251 LOC  — SVG network map with zoom/pan
+│       │   └── ui/                  # ~30 shadcn/ui components (accordion, badge, button, card,
+│       │                            #   checkbox, dialog, dropdown-menu, input, label, popover,
+│       │                            #   progress, scroll-area, select, separator, sheet, slider,
+│       │                            #   spinner, switch, table, tabs, textarea, toast, toaster,
+│       │                            #   toggle, toggle-group, tooltip)
+│       │
 │       ├── context/
-│       │   ├── FileContext.tsx      # Global file state: files[], CRUD, refreshCounter (93 LOC)
-│       │   └── ThemeContext.tsx     # Dark mode + color theme, persisted to localStorage (71 LOC)
+│       │   ├── FileContext.tsx      # 93 LOC — global file list, CRUD operations, refreshCounter
+│       │   └── ThemeContext.tsx     # 71 LOC — dark mode + color theme, localStorage persistence
+│       │
 │       ├── hooks/
-│       │   ├── use-mobile.tsx       # useIsMobile() hook for responsive breakpoints
-│       │   └── use-toast.ts        # useToast() hook for notification system
+│       │   ├── use-mobile.tsx       # useIsMobile() — responsive breakpoint detection
+│       │   └── use-toast.ts        # useToast() — toast notification queue system
+│       │
 │       └── lib/
-│           ├── inpAnalyzer.ts      # Client-side INP deep structural analysis engine (302 LOC)
-│           ├── swmmEngine.ts       # WebAssembly SWMM simulation engine integration (290 LOC)
-│           ├── api.ts              # All API client functions and TypeScript types (274 LOC)
-│           ├── diff.ts             # File comparison/diff logic for Compare page (220 LOC)
-│           ├── queryClient.ts      # TanStack Query client configuration (57 LOC)
-│           ├── mock-data.ts        # Sample data helpers (76 LOC)
-│           └── utils.ts            # cn() utility for Tailwind class merging (6 LOC)
+│           ├── inpAnalyzer.ts      # 302 LOC — client-side structural analysis engine
+│           ├── swmmEngine.ts       # 290 LOC — external SWMM simulation + WASM hooks
+│           ├── api.ts              # 275 LOC — all fetch wrappers + TypeScript interfaces
+│           ├── diff.ts             # 221 LOC — section-aware INP file diff algorithm
+│           ├── mock-data.ts        # 76 LOC  — sample data helpers
+│           ├── queryClient.ts      # 57 LOC  — TanStack Query client (no auto-refetch)
+│           └── utils.ts            # 6 LOC   — cn() for Tailwind class merging
 │
 ├── server/                          # Backend (Express + TypeScript)
-│   ├── routes.ts                   # All 18 API route handlers (820 LOC)
-│   ├── reswmm.ts                  # ReSWMM conduit discretization engine (598 LOC)
-│   ├── storage.ts                  # IStorage interface + DatabaseStorage implementation (235 LOC)
-│   ├── inp-parser.ts              # SWMM5 .inp file metadata parser (189 LOC)
-│   ├── index.ts                    # Server entry: Express app, registers routes, starts listening
-│   ├── db.ts                       # Drizzle ORM database connection setup
-│   ├── objectStorage.ts           # Replit Object Storage service wrapper (upload/download/delete)
+│   ├── routes.ts                   # 821 LOC — all 18 API route handlers
+│   ├── reswmm.ts                  # 598 LOC — ReSWMM conduit discretization algorithm
+│   ├── storage.ts                  # 236 LOC — IStorage interface + DatabaseStorage (Drizzle)
+│   ├── inp-parser.ts              # 189 LOC — section-based metadata parser
+│   ├── index.ts                    # Server entry: Express app creation + listen
+│   ├── db.ts                       # Drizzle ORM connection via DATABASE_URL
+│   ├── objectStorage.ts           # Object Storage wrapper: upload/download/update/delete
 │   ├── objectAcl.ts               # Object storage access control policies
-│   ├── vite.ts                    # Vite dev server middleware integration
-│   ├── static.ts                  # Static file serving for production builds
-│   └── samples/                   # 5 bundled sample .inp model files for demo loading
+│   ├── vite.ts                    # Vite dev server as Express middleware
+│   ├── static.ts                  # Production static file serving from dist/public
+│   └── samples/                   # 5 bundled .inp files for one-click demo loading
 │
 ├── shared/
-│   └── schema.ts                  # Drizzle ORM schema + Zod validation + TypeScript types (43 LOC)
+│   └── schema.ts                  # 43 LOC — Drizzle tables + Zod schemas + TS types
 │
 ├── script/
-│   └── build.ts                   # Production build script (Vite frontend + esbuild backend)
+│   └── build.ts                   # Vite frontend build + esbuild backend bundle
 │
-├── drizzle.config.ts              # Drizzle Kit configuration (database push/migrations)
-├── vite.config.ts                 # Vite configuration with React + Replit plugins
-├── vite-plugin-meta-images.ts     # Custom Vite plugin for meta image handling
-├── tsconfig.json                  # TypeScript config (path aliases: @shared → shared/, @assets → attached_assets/)
+├── drizzle.config.ts              # Drizzle Kit config (schema-first, db:push)
+├── vite.config.ts                 # Vite + React plugin + Replit plugins
+├── vite-plugin-meta-images.ts     # Custom Vite plugin for OG meta images
+├── tsconfig.json                  # TS config with path aliases (@shared, @assets)
 ├── components.json                # shadcn/ui configuration
-├── package.json                   # Dependencies, scripts, project metadata
-└── package-lock.json              # Locked dependency versions
+├── package.json                   # All deps, scripts, metadata
+└── package-lock.json              # Lockfile
 ```
 
 ---
 
-## 4. System Architecture
+## 4. Architecture Deep Dive
 
-### 4.1 Frontend
+### 4.1 Frontend Architecture
 
-| Aspect              | Technology                                                                |
-|:---------------------|:-------------------------------------------------------------------------|
-| Framework            | React 19 with TypeScript                                                |
-| Routing              | Wouter (lightweight client-side router)                                 |
-| Global State         | `FileContext` (files list, CRUD ops, refreshCounter), `ThemeContext` (dark mode, color theme) |
-| Server State         | TanStack Query (`@tanstack/react-query`) — configured with no auto-refetch |
-| UI Components        | shadcn/ui built on Radix UI primitives (~30 components)                 |
-| Styling              | Tailwind CSS v4 with CSS variables for theming                          |
-| Animations           | Framer Motion for page transitions and interactive elements             |
-| Icons                | Lucide React                                                            |
-| Build Tool           | Vite with HMR                                                          |
+**Framework Stack:**
+- React 19 with TypeScript
+- Wouter for client-side routing (6 routes + 404 fallback)
+- TanStack Query for server state — configured with `refetchOnWindowFocus: false` and `staleTime: Infinity`
+- shadcn/ui component library (~30 components) built on Radix UI
+- Tailwind CSS v4 with CSS custom properties for theming
+- Framer Motion for page transitions and micro-interactions
+- Lucide React for icons
+
+**Provider Nesting (App.tsx):**
+```
+QueryClientProvider
+  └── ThemeProvider         ← reads/writes localStorage "swmm-theme"
+      └── FileProvider      ← loads all files on mount, exposes CRUD + refreshCounter
+          └── TooltipProvider
+              └── Router    ← Wouter Switch with 7 Routes
+              └── Toaster   ← Toast notification system
+```
 
 **Route Map:**
 
-| Route          | Page Component     | Purpose                                              |
-|:---------------|:-------------------|:-----------------------------------------------------|
-| `/`            | `Dashboard`        | Main file browser, stats, search, directory view     |
-| `/compare`     | `CompareModels`    | Side-by-side model comparison                        |
-| `/ai-analysis` | `AIAnalysis`       | Health scoring and batch analysis                    |
-| `/insights`    | `Insights`         | Statistical visualizations across all models         |
-| `/reswmm`      | `ReSWMM`           | Conduit discretization configuration                 |
-| `/settings`    | `Settings`         | Theme and dark mode preferences                     |
-| `*`            | `NotFound`         | 404 fallback page                                    |
+| Route          | Component        | LOC | Purpose                                              |
+|:---------------|:-----------------|:----|:-----------------------------------------------------|
+| `/`            | `Dashboard`      | 928 | Stats bar, search, filters, sorting, collapsible directory sections |
+| `/compare`     | `CompareModels`  | 386 | Two-file selection, section-aware diff, markdown report |
+| `/ai-analysis` | `AIAnalysis`     | 613 | Single model health scoring + batch "Analyze All"    |
+| `/insights`    | `Insights`       | 355 | 6 statistical visualizations with pure CSS charts    |
+| `/reswmm`      | `ReSWMM`         | 388 | Discretization config + per-directory apply          |
+| `/settings`    | `Settings`       | 177 | Dark mode, color themes, notification toggles        |
+| `*`            | `NotFound`       | 21  | 404 fallback                                         |
 
-**Provider Nesting Order** (in `App.tsx`):
+### 4.2 Backend Architecture
+
+**Server Stack:**
+- Node.js + Express
+- TypeScript compiled with `tsx` (dev) / `esbuild` (prod)
+- Multer for multipart uploads (in-memory storage, 200 MB limit per file)
+- Archiver for ZIP creation
+- Server-side INP parsing for metadata extraction
+
+**Request Flow:**
 ```
-QueryClientProvider → ThemeProvider → FileProvider → TooltipProvider → Router + Toaster
+Client Request → Express Router → Route Handler → IStorage (Drizzle/PostgreSQL)
+                                                 → ObjectStorageService (GCS)
+                                                 → Response (JSON or stream)
 ```
 
-### 4.2 Backend
+### 4.3 Data Architecture
 
-| Aspect              | Technology                                                                |
-|:---------------------|:-------------------------------------------------------------------------|
-| Runtime              | Node.js with Express                                                    |
-| Language             | TypeScript (dev: `tsx` watch mode, prod: `esbuild` → `dist/index.cjs`) |
-| API Pattern          | RESTful with JSON responses                                             |
-| File Uploads         | Multer with in-memory storage, 200 MB file size limit                   |
-| Duplicate Detection  | Server checks filename uniqueness within target directory before upload  |
-| Archive Export       | Archiver library for ZIP creation                                       |
-| External Simulation  | Sends .inp content to `swmm-engine--robertdickinson.replit.app`         |
-
-### 4.3 Data Storage
-
-| Store               | Technology                  | Purpose                                               |
-|:---------------------|:---------------------------|:------------------------------------------------------|
-| Metadata             | PostgreSQL + Drizzle ORM   | File metadata, user accounts, pins, access timestamps |
-| Raw File Content     | Replit Object Storage (GCS)| `.inp` and `.xp` file content stored as text blobs    |
-| Client Preferences   | localStorage               | Theme settings (`swmm-theme`), ReSWMM config         |
+| Layer               | Technology                  | What It Stores                                          |
+|:---------------------|:---------------------------|:--------------------------------------------------------|
+| PostgreSQL           | Drizzle ORM                | File metadata (name, dir, counts, pins, timestamps)     |
+| Object Storage       | GCS via Replit integration | Raw `.inp`/`.xp` file content as text                   |
+| Browser localStorage | Native                     | Theme prefs (`swmm-theme`), ReSWMM config (`reswmm-config`) |
+| Server Memory        | Module variable            | Insights cache (5-min TTL)                               |
 
 ---
 
-## 5. Database Schema
+## 5. Database Schema (PostgreSQL)
 
 ### 5.1 `users` Table
 
-| Column     | Type      | Constraints                        | Notes                  |
-|:-----------|:----------|:-----------------------------------|:-----------------------|
-| `id`       | `varchar` | Primary Key, Default: `gen_random_uuid()` | Auto-generated UUID    |
-| `username` | `text`    | Not Null, Unique                   |                        |
-| `password` | `text`    | Not Null                           |                        |
+```sql
+CREATE TABLE users (
+  id       VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+  username TEXT    NOT NULL UNIQUE,
+  password TEXT    NOT NULL
+);
+```
 
 ### 5.2 `inp_files` Table
 
-| Column              | Type        | Constraints                              | Notes                                  |
-|:---------------------|:-----------|:-----------------------------------------|:---------------------------------------|
-| `id`                | `varchar`   | Primary Key, Default: `gen_random_uuid()`| Auto-generated UUID                    |
-| `filename`           | `text`      | Not Null                                 | Original filename (e.g., `model.inp`)  |
-| `directory`          | `text`      | Not Null                                 | Logical directory grouping             |
-| `size`               | `integer`   | Not Null                                 | File size in bytes                     |
-| `lastModified`       | `timestamp` | Not Null                                 | Column name: `last_modified`           |
-| `nodeCount`          | `integer`   | Not Null, Default: 0                     | Column name: `node_count`              |
-| `linkCount`          | `integer`   | Not Null, Default: 0                     | Column name: `link_count`              |
-| `subcatchmentCount`  | `integer`   | Not Null, Default: 0                     | Column name: `subcatchment_count`      |
-| `description`        | `text`      | Nullable                                 |                                        |
-| `objectPath`         | `text`      | Not Null                                 | Column name: `object_path`             |
-| `createdAt`          | `timestamp` | Not Null, Default: `now()`               | Column name: `created_at`              |
-| `isPinned`           | `boolean`   | Not Null, Default: false                 | Column name: `is_pinned`               |
-| `lastAccessedAt`     | `timestamp` | Nullable                                 | Column name: `last_accessed_at`        |
+```sql
+CREATE TABLE inp_files (
+  id                 VARCHAR   PRIMARY KEY DEFAULT gen_random_uuid(),
+  filename           TEXT      NOT NULL,               -- e.g. "city_combined.inp"
+  directory          TEXT      NOT NULL,               -- e.g. "EPA" or "Hydraulics"
+  size               INTEGER   NOT NULL,               -- file size in bytes
+  last_modified      TIMESTAMP NOT NULL,               -- date from upload
+  node_count         INTEGER   NOT NULL DEFAULT 0,     -- parsed: JUNCTIONS+OUTFALLS+DIVIDERS+STORAGE
+  link_count         INTEGER   NOT NULL DEFAULT 0,     -- parsed: CONDUITS+PUMPS+ORIFICES+WEIRS+OUTLETS
+  subcatchment_count INTEGER   NOT NULL DEFAULT 0,     -- parsed: SUBCATCHMENTS
+  description        TEXT,                             -- user or auto-generated description
+  object_path        TEXT      NOT NULL,               -- GCS path: /objects/inp-files/<uuid>-<name>
+  created_at         TIMESTAMP NOT NULL DEFAULT NOW(), -- record creation time
+  is_pinned          BOOLEAN   NOT NULL DEFAULT FALSE, -- quick access pin
+  last_accessed_at   TIMESTAMP                         -- last time user viewed this file
+);
+```
 
-### 5.3 Type Exports (`shared/schema.ts`)
+**Drizzle Property → SQL Column Mapping:**
 
-| Export                | Type         | Purpose                                                     |
-|:----------------------|:-------------|:------------------------------------------------------------|
-| `insertInpFileSchema` | Zod schema   | Validates insert data (omits `id`, `createdAt`)             |
-| `InsertInpFile`       | TypeScript   | `z.infer<typeof insertInpFileSchema>`                       |
-| `InpFile`             | TypeScript   | `typeof inpFiles.$inferSelect`                              |
-| `insertUserSchema`    | Zod schema   | Validates user insert (picks `username`, `password`)        |
-| `InsertUser`          | TypeScript   | `z.infer<typeof insertUserSchema>`                          |
-| `User`                | TypeScript   | `typeof users.$inferSelect`                                 |
+| Drizzle Property     | SQL Column           | Type        |
+|:---------------------|:---------------------|:------------|
+| `id`                 | `id`                 | `varchar`   |
+| `filename`           | `filename`           | `text`      |
+| `directory`          | `directory`          | `text`      |
+| `size`               | `size`               | `integer`   |
+| `lastModified`       | `last_modified`      | `timestamp` |
+| `nodeCount`          | `node_count`         | `integer`   |
+| `linkCount`          | `link_count`         | `integer`   |
+| `subcatchmentCount`  | `subcatchment_count` | `integer`   |
+| `description`        | `description`        | `text`      |
+| `objectPath`         | `object_path`        | `text`      |
+| `createdAt`          | `created_at`         | `timestamp` |
+| `isPinned`           | `is_pinned`          | `boolean`   |
+| `lastAccessedAt`     | `last_accessed_at`   | `timestamp` |
 
----
+### 5.3 Exported Types (`shared/schema.ts`)
 
-## 6. API Endpoints (18 total)
+```typescript
+export const insertInpFileSchema = createInsertSchema(inpFiles).omit({ id: true, createdAt: true });
+export type InsertInpFile = z.infer<typeof insertInpFileSchema>;
+export type InpFile = typeof inpFiles.$inferSelect;
 
-### 6.1 File Management
-
-| Method   | Path                            | Line | Description                                                                                      |
-|:---------|:--------------------------------|:-----|:-------------------------------------------------------------------------------------------------|
-| `GET`    | `/api/inp-files`                | 36   | Paginated file list. Query: `limit` (default 100), `offset` (default 0). Response: `{files[], total, limit, offset, hasMore}` |
-| `GET`    | `/api/inp-files/:id`            | 117  | Single file with full text content + parsed coordinates for map rendering                        |
-| `POST`   | `/api/inp-files/upload`         | 180  | Multi-file upload (multipart). Accepts `.inp` and `.xp`. Skips duplicates. Response: `{files[], count, failed[], failedCount, skipped[], skippedCount}` |
-| `PUT`    | `/api/inp-files/:id/content`    | 146  | Update file text content. Re-parses metadata (node/link/sub counts) and updates DB               |
-| `DELETE` | `/api/inp-files/:id`            | 257  | Delete single file from both DB and object storage                                               |
-| `DELETE` | `/api/directories/:directory`   | 271  | Delete all files in a directory (URL-encoded name)                                               |
-
-### 6.2 Search & Comparison
-
-| Method   | Path                            | Line | Description                                                                                      |
-|:---------|:--------------------------------|:-----|:-------------------------------------------------------------------------------------------------|
-| `GET`    | `/api/inp-files/compare`        | 66   | Compare two files. Query: `file1`, `file2` (IDs). Returns both files' metadata + full content    |
-| `GET`    | `/api/inp-files/search/content` | 291  | Full-text content search across all stored files. Returns matches with line numbers + context     |
-
-### 6.3 Quick Access
-
-| Method   | Path                            | Line | Description                                                                                      |
-|:---------|:--------------------------------|:-----|:-------------------------------------------------------------------------------------------------|
-| `POST`   | `/api/inp-files/:id/pin`        | 334  | Toggle pinned status for a file                                                                  |
-| `GET`    | `/api/pinned-files`             | 347  | List all pinned files                                                                            |
-| `GET`    | `/api/recent-files`             | 363  | List recently accessed files. Query: `limit` (default 5)                                         |
-| `POST`   | `/api/inp-files/:id/access`     | 380  | Update `lastAccessedAt` timestamp for a file                                                     |
-
-### 6.4 Statistics & Insights
-
-| Method   | Path                            | Line | Description                                                                                      |
-|:---------|:--------------------------------|:-----|:-------------------------------------------------------------------------------------------------|
-| `GET`    | `/api/stats`                    | 26   | Aggregate stats: total files/dirs/nodes/links/subs, averages, largest/smallest, directory breakdown, `.inp`/`.xp` counts |
-| `GET`    | `/api/insights`                 | 643  | Deep analysis: pipe diameters, cross-section shapes, Manning's n, conduit lengths, offsets, complexity. 5-min server cache |
-
-### 6.5 Operations
-
-| Method   | Path                            | Line | Description                                                                                      |
-|:---------|:--------------------------------|:-----|:-------------------------------------------------------------------------------------------------|
-| `POST`   | `/api/load-samples`             | 474  | Load 5 bundled sample models into "Sample Models" directory. Deduplicates by filename            |
-| `POST`   | `/api/reswmm/apply`             | 526  | Apply ReSWMM conduit discretization to all files in a directory. Creates `_Disc.inp` output files|
-| `POST`   | `/api/simulate/:id`             | 434  | Send file content to external SWMM engine API for hydraulic simulation                           |
-| `POST`   | `/api/export`                   | 390  | Export files (by IDs or entire directory) as a downloadable `.zip` archive                        |
+export const insertUserSchema = createInsertSchema(users).pick({ username: true, password: true });
+export type InsertUser = z.infer<typeof insertUserSchema>;
+export type User = typeof users.$inferSelect;
+```
 
 ---
 
-## 7. Storage Interface (`server/storage.ts`)
+## 6. API Endpoints — Complete Reference (18 Routes)
 
-The `IStorage` interface defines all data access methods. `DatabaseStorage` implements them with Drizzle ORM.
+### 6.1 `GET /api/stats` (line 26)
 
-### 7.1 User Operations
-- `getUser(id: string): Promise<User | undefined>`
-- `getUserByUsername(username: string): Promise<User | undefined>`
-- `createUser(user: InsertUser): Promise<User>`
+Returns aggregate statistics across all models.
 
-### 7.2 File CRUD
-- `getAllInpFiles(): Promise<InpFile[]>` — all files ordered by `createdAt` desc
-- `getAllInpFilesPaginated(limit, offset): Promise<{files, total}>` — paginated with SQL count
-- `getInpFile(id: string): Promise<InpFile | undefined>` — single file by ID
-- `createInpFile(file: InsertInpFile): Promise<InpFile>` — insert new file record
-- `deleteInpFile(id: string): Promise<void>` — delete by ID
-- `getInpFilesByDirectory(directory: string): Promise<InpFile[]>` — filter by directory
-- `deleteDirectory(directory: string): Promise<InpFile[]>` — delete all in directory, returns deleted records
-- `updateFileMetadata(id, {nodeCount, linkCount, subcatchmentCount, size}): Promise<InpFile | undefined>`
+**Response:**
+```json
+{
+  "totalFiles": 1042,
+  "totalDirectories": 18,
+  "totalNodes": 220541,
+  "totalLinks": 226893,
+  "totalSubcatchments": 70214,
+  "totalSizeBytes": 482394112,
+  "avgNodesPerFile": 211,
+  "avgLinksPerFile": 217,
+  "avgSubcatchmentsPerFile": 67,
+  "largestFile": { "filename": "city_combined.inp", "size": 24700000 },
+  "smallestFile": { "filename": "test.inp", "size": 3200 },
+  "directories": [{ "name": "EPA", "fileCount": 42 }, ...],
+  "inpCount": 980,
+  "xpCount": 62
+}
+```
 
-### 7.3 Quick Access
-- `togglePinFile(id: string): Promise<InpFile | undefined>` — flips `isPinned` boolean
-- `getPinnedFiles(): Promise<InpFile[]>` — files where `isPinned` = true
-- `getRecentFiles(limit: number): Promise<InpFile[]>` — ordered by `lastAccessedAt` desc, `NOT NULL` filter
-- `updateLastAccessed(id: string): Promise<void>` — sets `lastAccessedAt` to `new Date()`
-- `searchFiles(query: string): Promise<InpFile[]>` — `ilike` search across filename, directory, description
+The `inpCount`/`xpCount` use PostgreSQL `FILTER(WHERE filename LIKE ...)` for extension-based counting.
 
-### 7.4 Statistics
-- `getStats()` — SQL aggregations using `count()`, `sum()`, `countDistinct()`, plus filtered `.inp`/`.xp` counts via PostgreSQL `FILTER(WHERE ...)` clause
+### 6.2 `GET /api/inp-files` (line 36)
+
+Paginated file list.
+
+**Query params:** `limit` (default 100), `offset` (default 0)
+
+**Response:**
+```json
+{
+  "files": [{
+    "id": "uuid-string",
+    "filename": "model.inp",
+    "directory": "EPA",
+    "size": "2.45 MB",          // formatted string, not bytes
+    "lastModified": "2024-03-15", // ISO date string
+    "nodeCount": 342,
+    "linkCount": 385,
+    "subcatchmentCount": 28,
+    "description": "Uploaded via web interface"
+  }],
+  "total": 1042,
+  "limit": 100,
+  "offset": 0,
+  "hasMore": true
+}
+```
+
+**Important:** `size` is a formatted string (e.g., "2.45 MB"), not raw bytes. The `formatFileSize()` helper converts bytes to MB with 2 decimal places.
+
+### 6.3 `GET /api/inp-files/compare` (line 66)
+
+Compare two files side-by-side.
+
+**Query params:** `file1` (ID), `file2` (ID)
+
+**Response:** Two file objects with `id`, `filename`, `directory`, `nodeCount`, `linkCount`, `subcatchmentCount`, and full `content` (raw INP text).
+
+### 6.4 `GET /api/inp-files/:id` (line 117)
+
+Single file with full content and coordinates for map visualization.
+
+**Response:** All `inp_files` columns + `fileContent` (raw text from Object Storage) + `coordinates` (parsed from `[COORDINATES]`, `[VERTICES]`, `[POLYGONS]`, `[CONDUITS]` sections):
+
+```json
+{
+  "id": "...", "filename": "...", "directory": "...",
+  "fileContent": "[TITLE]\nExample Model\n[JUNCTIONS]\n...",
+  "coordinates": {
+    "nodes": [{ "id": "J1", "x": 1000.0, "y": 2000.0 }],
+    "vertices": [{ "id": "C1", "vertices": [{"x": 1100, "y": 2100}] }],
+    "polygons": [{ "id": "S1", "vertices": [{"x": 900, "y": 1900}, ...] }],
+    "links": [{ "id": "C1", "fromNode": "J1", "toNode": "J2" }]
+  },
+  "size": "2.45 MB",
+  "lastModified": "2024-03-15"
+}
+```
+
+Also triggers `parseCoordinates()` from `inp-parser.ts` which extracts node positions, link vertex paths, and subcatchment polygon boundaries.
+
+### 6.5 `PUT /api/inp-files/:id/content` (line 146)
+
+Update file text content. Re-parses metadata and updates DB.
+
+**Request body:** `{ "content": "full INP text..." }`
+
+**Server actions:**
+1. Updates content in Object Storage via `updateInpFileContent()`
+2. Re-parses the new content with `parseInpFile()` to get updated node/link/subcatchment counts
+3. Updates DB metadata via `storage.updateFileMetadata()`
+
+**Response:** `{ "success": true, "nodeCount": 350, "linkCount": 392, "subcatchmentCount": 30 }`
+
+### 6.6 `POST /api/inp-files/upload` (line 180)
+
+Multi-file upload with duplicate detection.
+
+**Request:** Multipart form data with `files` field + optional `directory` field (default: "Imported Files")
+
+**Server logic:**
+1. Filters uploaded files for `.inp` or `.xp` extensions
+2. Fetches existing filenames in target directory → builds `Set`
+3. For each file: if filename exists in Set → skip; otherwise → parse metadata → upload to Object Storage → create DB record
+4. Returns counts of created, skipped, and failed
+
+**Response:**
+```json
+{
+  "files": [{ "id": "...", "filename": "model.inp", ... }],
+  "count": 8,
+  "failed": [{ "filename": "bad.inp", "error": "Parse error" }],
+  "failedCount": 1,
+  "skipped": [{ "filename": "existing.inp" }],
+  "skippedCount": 3
+}
+```
+
+### 6.7 `DELETE /api/inp-files/:id` (line 257)
+
+Delete single file. Removes from both Object Storage and database.
+
+### 6.8 `DELETE /api/directories/:directory` (line 271)
+
+Delete all files in a directory. URL-encodes the directory name. Deletes from Object Storage first, then from DB. Returns `{ "success": true, "deletedCount": 42 }`.
+
+### 6.9 `GET /api/inp-files/search/content` (line 291)
+
+Full-text search inside file content across all models.
+
+**Query param:** `q` (search string)
+
+**Server logic:**
+1. Fetches ALL files from DB
+2. For each file, downloads content from Object Storage
+3. Case-insensitive `includes()` check
+4. For matches, scans line-by-line and returns up to 5 matching lines with line numbers
+
+**Response:**
+```json
+[{
+  "id": "uuid",
+  "filename": "model.inp",
+  "directory": "EPA",
+  "matches": [
+    { "lineNumber": 42, "content": "C1  J1  J2  500  0.013" },
+    { "lineNumber": 108, "content": "C2  J3  J4  750  0.013" }
+  ]
+}]
+```
+
+### 6.10 `POST /api/inp-files/:id/pin` (line 334)
+
+Toggle pin status. Returns `{ "id": "...", "isPinned": true }`.
+
+### 6.11 `GET /api/pinned-files` (line 347)
+
+List pinned files. Returns array of `{ id, filename, directory, isPinned, lastAccessedAt }`.
+
+### 6.12 `GET /api/recent-files` (line 363)
+
+Recently viewed files. **Query param:** `limit` (default 5). Filters out files with null `lastAccessedAt`.
+
+### 6.13 `POST /api/inp-files/:id/access` (line 380)
+
+Record file access (updates `lastAccessedAt` to current time). Called whenever user opens file content viewer.
+
+### 6.14 `POST /api/export` (line 390)
+
+Export files as ZIP archive.
+
+**Request body (option A):** `{ "fileIds": ["id1", "id2", ...] }`  
+**Request body (option B):** `{ "directory": "EPA" }`
+
+Uses Archiver library with compression level 9. Streams the ZIP directly to the response. Client receives blob and triggers browser download as `swmm5-export-{timestamp}.zip`.
+
+### 6.15 `POST /api/simulate/:id` (line 434)
+
+Send model to external SWMM simulation engine.
+
+**Server logic:**
+1. Reads file content from Object Storage
+2. POSTs to `https://swmm-engine--robertdickinson.replit.app/api/simulate` with `{ inp_content, filename }`
+3. Proxies the response back to client
+
+### 6.16 `POST /api/load-samples` (line 474)
+
+Load bundled sample models from `server/samples/` directory into "Sample Models" directory. Deduplicates by checking existing filenames. Extracts title from `[TITLE]` section as description.
+
+**Response:** `{ "message": "Loaded 5 sample models", "loaded": 5, "files": ["Example1.inp", ...] }`
+
+### 6.17 `POST /api/reswmm/apply` (line 526)
+
+Apply ReSWMM conduit discretization to all files in a directory.
+
+**Request body:** `{ "directory": "EPA", "config": { "enabled": true, "method": "fixed_interval", ... } }`
+
+**Server logic:**
+1. Validates config parameters (min/max lengths, dx/D ratio, MNSA)
+2. Fetches all files in directory (skips existing `_Disc.inp` files)
+3. For each file: downloads content → runs `applyReswmm()` → if changed, creates or updates `_Disc.inp` file
+4. If a `_Disc.inp` already exists for a file, updates it in-place; otherwise creates new
+
+**Response:**
+```json
+{
+  "directory": "EPA",
+  "totalFiles": 42,
+  "filesChanged": 35,
+  "filesCreated": 35,
+  "method": "fixed_interval",
+  "results": [{
+    "filename": "model_Disc.inp",
+    "changed": true,
+    "stats": { "originalConduits": 385, "newConduits": 892, "nodesAdded": 507 },
+    "newFileId": "uuid"
+  }]
+}
+```
+
+### 6.18 `GET /api/insights` (line 643)
+
+Deep statistical analysis of all models. Server-side 5-minute cache.
+
+**Processing pipeline:**
+1. Fetches up to 2000 files from DB
+2. Downloads content from Object Storage in batches of 20 (using `Promise.allSettled`)
+3. Parses each file's `[CONDUITS]` section for lengths, Manning's n, offsets
+4. Parses `[XSECTIONS]` section for shapes and diameters
+5. Bins data into histogram buckets:
+   - Pipe diameters: 4", 6", 8", 10", 12", 15", 18", 21", 24", 30", 36", 42", 48", 54", 60", 72", 84", 96"+ 
+   - Manning's n: 0.009-0.011, 0.011-0.013, 0.013-0.015, 0.015-0.020, 0.020-0.030, 0.030+
+   - Conduit lengths: 0-50, 50-100, 100-200, 200-500, 500-1000, 1000+
+   - Offsets: Both Zero, Outlet Only, Inlet Only, Both Nonzero
+6. Caches result in module-level variable with 5-minute TTL
+
+**Diameter conversion logic:** If `geom1 < 10`, assumes feet and converts to inches (`geom1 * 12`); otherwise assumes inches directly.
 
 ---
 
-## 8. Object Storage
+## 7. Storage Interface (`server/storage.ts`) — All Methods
+
+```typescript
+interface IStorage {
+  // Users
+  getUser(id: string): Promise<User | undefined>;
+  getUserByUsername(username: string): Promise<User | undefined>;
+  createUser(user: InsertUser): Promise<User>;
+
+  // File CRUD
+  getAllInpFiles(): Promise<InpFile[]>;                    // ordered by createdAt DESC
+  getAllInpFilesPaginated(limit, offset): Promise<{files, total}>;
+  getInpFile(id: string): Promise<InpFile | undefined>;
+  createInpFile(file: InsertInpFile): Promise<InpFile>;
+  deleteInpFile(id: string): Promise<void>;
+  getInpFilesByDirectory(directory: string): Promise<InpFile[]>;
+  deleteDirectory(directory: string): Promise<InpFile[]>;  // returns deleted records
+  updateFileMetadata(id, {nodeCount, linkCount, subcatchmentCount, size}): Promise<InpFile | undefined>;
+
+  // Quick Access
+  togglePinFile(id: string): Promise<InpFile | undefined>;  // flips isPinned
+  getPinnedFiles(): Promise<InpFile[]>;                      // WHERE is_pinned = true
+  getRecentFiles(limit: number): Promise<InpFile[]>;         // ORDER BY last_accessed_at DESC, NOT NULL only
+  updateLastAccessed(id: string): Promise<void>;             // SET last_accessed_at = new Date()
+  searchFiles(query: string): Promise<InpFile[]>;            // ilike on filename, directory, description
+
+  // Stats
+  getStats(): Promise<{
+    totalFiles, totalDirectories, totalNodes, totalLinks, totalSubcatchments,
+    totalSizeBytes, avgNodesPerFile, avgLinksPerFile, avgSubcatchmentsPerFile,
+    largestFile, smallestFile, directories, inpCount, xpCount
+  }>;
+}
+```
+
+The `getStats()` implementation uses SQL aggregations: `count()`, `sum()`, `countDistinct()`, and PostgreSQL `FILTER(WHERE ...)` for `.inp`/`.xp` extension counting.
+
+---
+
+## 8. Object Storage Service (`server/objectStorage.ts`)
 
 | Aspect               | Detail                                                           |
 |:----------------------|:-----------------------------------------------------------------|
-| Provider              | Replit Object Storage (Google Cloud Storage backend)             |
-| Service Wrapper       | `server/objectStorage.ts`                                        |
-| ACL Policies          | `server/objectAcl.ts`                                            |
+| Provider              | Replit Object Storage → Google Cloud Storage backend             |
 | File Path Pattern     | `/objects/inp-files/<uuid>-<filename>`                           |
 | Supported Formats     | `.inp` (SWMM5), `.xp` (XPSWMM)                                 |
-| Operations            | Upload (text content), Download (read as string), Delete         |
-| Max Upload Size       | 200 MB (Multer limit in `routes.ts`)                             |
+| Max Upload Size       | 200 MB (Multer limit)                                            |
 | Environment Variables | `DEFAULT_OBJECT_STORAGE_BUCKET_ID`, `PUBLIC_OBJECT_SEARCH_PATHS`, `PRIVATE_OBJECT_DIR` |
 
----
-
-## 9. Feature Details
-
-### 9.1 Dashboard (`/`) — 927 LOC
-
-The main page showing all models organized by directory with aggregate statistics.
-
-**Stats Bar** (top of page):
-- Total Models count with `.inp` / `.xp` breakdown shown beneath
-- Total Nodes (sum across all models)
-- Total Links (sum across all models)
-- Total Subcatchments
-- Total Directories count
-
-**Quick Access Section**:
-- Pinned files row (files the user has starred for fast access)
-- Recently viewed files row (last 5 accessed models)
-
-**Search** (two modes):
-- **Filename search**: instant client-side filter as you type
-- **Content search**: server-side full-text search inside raw file content. Results show match count per file with a "View" button that opens a highlighted content viewer dialog (all matches wrapped in `<mark>` tags with line numbers)
-
-**Filters**:
-- Min/max node count sliders
-- Min/max link count sliders
-- Directory multi-select checkboxes
-
-**Sorting** (dropdown):
-- By name, file size, node count, link count, subcatchment count
-- Ascending/descending toggle
-
-**Directory Sections**:
-- Each directory is a collapsible section with chevron toggle
-- "Collapse All / Expand All" button in toolbar
-- Per-directory action buttons in header: ReSWMM (apply discretization) + Export (download as ZIP)
-- File count shown in parentheses next to directory name
-- Directory headers use `<div role="button">` (not `<button>`) to avoid nested button HTML errors
-
-**Empty State**:
-- When no files are loaded, shows onboarding cards and a "Load Sample Models" button
-
-### 9.2 FileCard (model cards) — 555 LOC
-
-Each model file is rendered as a card with:
-
-- **Header**: Filename, directory badge, file size
-- **Metadata Row**: Node count, Link count, Subcatchment count (with icons)
-- **Content Viewer/Editor**: Expandable panel to view raw `.inp`/`.xp` text. Editable with save (re-parses metadata on save)
-- **Map Visualizations** (two toggle-able views):
-  - **Standard SVG map**: Renders nodes as circles, links as lines with zoom/pan controls
-  - **Minecraft-style voxel map**: Renders geometry in a blocky aesthetic with multiple biome themes (Satellite, Desert, Snow, Forest, etc.)
-- **SWMM Simulation**: Button to send the model to the external SWMM engine
-- **Actions Dropdown Menu**:
-  - Pin/Unpin for quick access
-  - Download as `.inp` file
-  - Delete file
-  - Open in Engine (external link to SWMM5 Simulation Engine)
-  - Open in INP MAKER (external link)
-  - Run in BatchSWMM (external link)
-
-### 9.3 MinecraftMap — 1,136 LOC
-
-The largest component in the app. Renders stormwater network geometry in a Minecraft-inspired voxel style.
-
-- Multiple biome themes: Satellite, Desert, Snow, Forest, etc.
-- Nodes rendered as block-style markers
-- Links rendered as pixelated pipe connections
-- Background terrain generated procedurally
-- Subcatchment polygons rendered as colored block regions
-- Canvas-based rendering with zoom and pan support
-
-### 9.4 Sidebar — 566 LOC
-
-Navigation and file management sidebar:
-
-- **Navigation Links**: Dashboard, Compare Models, AI Analysis, Insights, ReSWMM, Settings
-- **Upload Buttons**: "Upload Files" (single/multi file picker) + "Import Directory" (folder picker)
-- **Directory Import Dialog**: Shows discovered `.inp`/`.xp` files with checkboxes, sorted by file size (largest first). "Select All" toggle. "Import N Files" button.
-- **Mobile Responsive**: Collapses to hamburger menu on small screens via Sheet component
-
-### 9.5 Compare Models (`/compare`) — 385 LOC
-
-- Two dropdown selectors to pick files from the entire library
-- Side-by-side display showing:
-  - Metadata comparison (nodes, links, subcatchments, size)
-  - Section-by-section diff highlighting additions, removals, changes
-- "Download Report" button generates a comprehensive markdown comparison report file
-
-### 9.6 AI Analysis (`/ai-analysis`) — 612 LOC
-
-**Single Model Analysis**:
-- Select a model from dropdown
-- Generates a health score from 0 to 100 based on:
-  - Section completeness (checks for presence of expected INP sections)
-  - Connectivity analysis (orphan nodes, disconnected components)
-  - Slope analysis (adverse slopes, zero-slope/flat conduits)
-  - Manning's n validation (out-of-range roughness coefficients)
-- Issues categorized into three severity levels: Errors, Warnings, Info
-- Section completeness displayed in 7 category groups:
-  1. Core Network (JUNCTIONS, OUTFALLS, CONDUITS, etc.)
-  2. Geometry (COORDINATES, VERTICES, POLYGONS, etc.)
-  3. Hydrology (RAINGAGES, SUBCATCHMENTS, INFILTRATION, etc.)
-  4. Hydraulics (OPTIONS, REPORT, TIMESERIES, etc.)
-  5. Water Quality (POLLUTANTS, LANDUSES, WASHOFF, etc.)
-  6. Green Infrastructure (LID_CONTROLS, LID_USAGE, etc.)
-  7. Snow & Climate (SNOWPACKS, TEMPERATURE, EVAPORATION, etc.)
-- Percentile comparison: shows where model ranks vs all loaded models for node/link/subcatchment counts
-
-**Batch Analysis** ("Analyze All" button):
-- Runs health checks on every model in the library
-- Shows a sortable summary table with filename, directory, health score, issue counts
-- Processes models sequentially with progress indicator
-
-### 9.7 Insights (`/insights`) — 355 LOC
-
-Six interactive statistical visualizations built with **pure CSS** (no charting library):
-
-1. **Pipe Diameter Distribution**: Histogram showing conduit count by diameter (in inches)
-2. **Cross-Section Shape Distribution**: Donut/ring chart with percentage breakdown (CIRCULAR, RECT_CLOSED, etc.)
-3. **Manning's n Distribution**: Binned histogram of roughness coefficients across all conduits
-4. **Conduit Length Distribution**: Histogram with range bins
-5. **Offset Patterns**: Categories by inlet/outlet offset configurations (No Offsets, Inlet Only, Outlet Only, Both)
-6. **Model Complexity**: Scatter plot of nodes vs links per model
-
-**Data pipeline**: Server processes ALL files in the database (no sampling). Parses file content in batches of 20 from object storage. Results cached server-side for 5 minutes (TTL-based, invalidates when file count changes).
-
-### 9.8 ReSWMM Conduit Discretization (`/reswmm`) — 387 LOC
-
-- **Engine**: `server/reswmm.ts` (598 LOC, algorithm by Robson Leo Pachaly)
-- **Purpose**: Splits long conduits into shorter segments with intermediate junction nodes for better CFL stability in dynamic wave routing
-- **Two Methods**:
-  1. **Fixed Interval**: Specify min/max conduit length range. Conduits outside get subdivided.
-  2. **Δx/D Ratio**: Segment length proportional to pipe diameter (`Δx = ratio × diameter`). Useful for varying pipe sizes.
-- **Key Parameters**: `fixedMinLength`, `fixedMaxLength`, `dxDRatio`, `MNSA` (Minimum Nodal Surface Area for new junctions)
-- **INP Sections Modified**: [TITLE], [JUNCTIONS], [CONDUITS], [XSECTIONS], [LOSSES], [COORDINATES]
-- **Output**: Creates `_Disc.inp` files alongside original files in the same directory
-- **Config Storage**: Browser `localStorage`, accessed via `getReswmmConfig()` / `saveReswmmConfig()`
-- **Trigger Points**: Per-directory button on Dashboard header, or from ReSWMM config page
-
-### 9.9 Settings (`/settings`) — 177 LOC
-
-- **Dark Mode Toggle**: Switch between light and dark themes
-- **Color Themes** (4 options with live swatch previews):
-  - EPA (green) — default
-  - UF (orange/blue)
-  - Oregon State (orange/black)
-  - Auburn (navy/orange)
-- **Persistence**: Stored in `localStorage` key `swmm-theme` as `{colorTheme, darkMode}`
+**Methods:**
+- `uploadInpFile(content: string, filename: string): Promise<string>` — returns object path
+- `getInpFileContent(objectPath: string): Promise<string>` — reads content as UTF-8
+- `updateInpFileContent(objectPath: string, content: string): Promise<void>` — overwrites
+- `deleteInpFile(objectPath: string): Promise<void>` — removes from storage
 
 ---
 
-## 10. Theme System
+## 9. Client-Side API Module (`client/src/lib/api.ts`)
 
-### CSS Architecture
-- Theme variables defined in `client/src/index.css` using CSS custom properties
-- Each theme: `.theme-epa`, `.theme-uf`, `.theme-oregon-state`, `.theme-auburn`
-- Dark variants: `.dark.theme-epa`, `.dark.theme-uf`, etc.
-- Variables: `--primary`, `--secondary`, `--background`, `--foreground`, `--border`, `--ring`, etc.
+### TypeScript Interfaces
 
-### Runtime Behavior
-- `ThemeContext.tsx` manages state and applies CSS classes to `document.documentElement`
-- On theme change: removes old class, adds new (e.g., `theme-epa` → `theme-uf`)
-- On dark toggle: adds/removes `dark` class
+```typescript
+interface InpFile {
+  id: string; filename: string; directory: string;
+  size: string;              // formatted: "2.45 MB"
+  lastModified: string;      // "2024-03-15"
+  nodeCount: number; linkCount: number; subcatchmentCount: number;
+  description?: string;
+}
 
-### Anti-Flash Prevention
-- Inline `<script>` in `<head>` of `client/index.html` (runs before any CSS/JS loads):
+interface CoordinateData {
+  nodes: { id: string; x: number; y: number }[];
+  vertices: { id: string; vertices: { x: number; y: number }[] }[];
+  polygons: { id: string; vertices: { x: number; y: number }[] }[];
+  links: { id: string; fromNode: string; toNode: string }[];
+}
+
+interface InpFileWithContent extends InpFile {
+  fileContent: string;
+  coordinates: CoordinateData | null;
+}
+
+interface UploadResult {
+  files: InpFile[]; count: number;
+  failed: { filename: string; error: string }[]; failedCount: number;
+  skipped: { filename: string }[]; skippedCount: number;
+}
+
+interface ContentSearchResult {
+  id: string; filename: string; directory: string;
+  matches: { lineNumber: number; content: string }[];
+}
+
+interface QuickAccessFile {
+  id: string; filename: string; directory: string;
+  isPinned: boolean; lastAccessedAt?: string;
+}
+```
+
+### Key Functions
+
+| Function                 | HTTP Call                          | Returns                        |
+|:-------------------------|:-----------------------------------|:-------------------------------|
+| `getAllInpFiles(l, o)`   | `GET /api/inp-files?limit&offset` | `PaginatedFilesResponse`       |
+| `getAllInpFilesFlat()`   | Multiple paginated GETs           | `InpFile[]` (all files)        |
+| `getInpFile(id)`         | `GET /api/inp-files/:id`          | `InpFileWithContent`           |
+| `uploadInpFiles(f, d)`  | `POST /api/inp-files/upload`      | `UploadResult`                 |
+| `deleteInpFile(id)`     | `DELETE /api/inp-files/:id`       | `void`                         |
+| `deleteDirectory(d)`    | `DELETE /api/directories/:d`      | `void`                         |
+| `searchFileContent(q)`  | `GET /api/.../search/content?q=`  | `ContentSearchResult[]`        |
+| `togglePinFile(id)`     | `POST /api/inp-files/:id/pin`     | `{ id, isPinned }`             |
+| `getPinnedFiles()`      | `GET /api/pinned-files`           | `QuickAccessFile[]`            |
+| `getRecentFiles(n)`     | `GET /api/recent-files?limit=n`   | `QuickAccessFile[]`            |
+| `recordFileAccess(id)`  | `POST /api/inp-files/:id/access`  | `void`                         |
+| `exportFiles(ids)`      | `POST /api/export` + blob download| `void` (triggers browser save) |
+| `exportDirectory(d)`    | `POST /api/export` + blob download| `void` (triggers browser save) |
+| `updateInpFileContent()` | `PUT /api/inp-files/:id/content` | `UpdateContentResult`          |
+
+`getAllInpFilesFlat()` paginated in batches of 100, continues until `hasMore` is false. Includes error resilience: returns partial results if a batch fails after successfully loading some files.
+
+Export functions create a temporary blob URL, programmatically click a download link, then revoke the URL.
+
+---
+
+## 10. Feature Details
+
+### 10.1 Dashboard — State Management (928 LOC)
+
+**State Variables:**
+```typescript
+searchQuery: string                  // instant filename filter
+contentSearchQuery: string           // server-side content search term
+contentSearchResults: ContentSearchResult[]  // results from content search
+contentHighlightFile: { id, term }   // selected file for highlighted viewer
+pinnedFiles: QuickAccessFile[]       // pinned files for quick access row
+recentFiles: QuickAccessFile[]       // recently viewed files row
+sortField: "name" | "size" | "nodeCount" | "linkCount" | "subcatchmentCount"
+sortDirection: "asc" | "desc"
+stats: StatsData                     // aggregate counts from /api/stats
+collapsedDirs: Set<string>           // which directories are collapsed
+filters: FilterState                 // min/max nodes, min/max links, selectedDirectories
+applyingReswmm: string | null        // directory currently being discretized
+exportingDir: string | null          // directory currently being exported
+loadingSamples: boolean              // loading sample models
+```
+
+**Data Flow:**
+1. On mount: `loadQuickAccess()` + `loadStats()` — fetch pinned/recent files and stats
+2. On `refreshCounter` change: reload both stats and quick access
+3. `filteredAndSortedFiles` = `useMemo` applying filters (node/link ranges, directories) + sorting
+4. `groupedFiles` = files grouped by directory name
+5. `filteredDirectories` = directories filtered by search query (searches both dir name and filenames within)
+
+**Search Behaviors:**
+- **Filename search**: Client-side filter. Typing filters both directory names and filenames instantly.
+- **Content search**: Calls `searchFileContent(query)` → server downloads every file from Object Storage → scans for matches → returns up to 5 matching lines per file. When user clicks "View" on a result, opens Dialog with full file content where all occurrences are wrapped in `<mark>` tags.
+
+**Highlight Viewer:**
+- `highlightText()` function wraps matches in `<mark className="bg-primary/30 ...">` tags
+- Full file content is loaded via `getInpFile()` and displayed in a scrollable Dialog
+- All matches in the content are highlighted with search term
+
+**Stats Bar Cards:**
+- Total Models (shows `.inp` count + `.xp` count breakdown below)
+- Total Nodes, Total Links, Total Subcatchments, Directories count
+- Each card has an icon and animated number
+
+**Directory Sections:**
+- Each directory is collapsible via chevron button
+- "Collapse All" / "Expand All" toggle in toolbar
+- Per-directory ReSWMM button: calls `handleApplyReswmm(directory)` which reads config from `getReswmmConfig()` (localStorage), POSTs to `/api/reswmm/apply`
+- Per-directory Export button: calls `handleExportDirectory(directory)` which POSTs to `/api/export`
+- Directory headers use `<div role="button">` (not `<button>`) to avoid nested button HTML validation errors
+
+**Empty State:**
+- When `files.length === 0` and not loading, shows hero image background + onboarding cards + "Load Sample Models" button
+- Hero image: `technical_hydrology_network_blueprint_abstract_background.png` from `attached_assets/`
+
+### 10.2 FileCard — Individual Model Cards (556 LOC)
+
+**State per card:**
+```typescript
+showContent: boolean         // content viewer/editor dialog open
+showMap: boolean             // SVG map visualization dialog open
+showMinecraftMap: boolean    // voxel map dialog open
+showDeleteConfirm: boolean   // delete confirmation alert
+fileContent: string          // loaded raw file text
+originalContent: string      // saved original (for unsaved changes detection)
+coordinates: CoordinateData  // parsed node/link positions
+hasChanges: boolean          // content edited but not saved
+```
+
+**Content Editor:**
+- Opens in a Dialog with a `<Textarea>` pre-filled with raw INP text
+- Tracks changes by comparing against `originalContent`
+- "Save" button calls `updateInpFileContent()` → server re-parses metadata
+- Close with unsaved changes: shows browser `confirm()` dialog
+- Copy button copies content to clipboard
+
+**Map Visualizations (two toggle buttons):**
+1. **SVG Map** (`MapVisualization.tsx`, 251 LOC): Renders nodes as circles, links as lines between nodes. Supports zoom/pan via mouse wheel and drag. Uses `<svg>` with dynamic viewBox. Falls back to "No coordinate data" message if `[COORDINATES]` section missing.
+2. **Minecraft Map** (`MinecraftMap.tsx`, 1,136 LOC — largest component): Renders network in voxel/block style with SVG. Features include:
+   - **Multiple biome themes** (forest, desert, ocean, etc.) with procedural terrain
+   - **Interactive tooltips**: Hover any node (◆), link (━), or subcatchment (≈) to see ID and metadata in a Minecraft-style tooltip popup
+   - **Isometric 2.5D toggle**: Button switches between flat top-down view and `perspective(800px) rotateX(45deg) rotateZ(-10deg) scale(0.85)` 3D perspective
+   - **Animated water flow**: Conduit pipes show flowing wave animation along their path indicating flow direction
+   - **Zoom/pan**: Mouse wheel + drag for navigation
+
+**Actions Dropdown:**
+- Pin/Unpin → calls `togglePinFile()` API, updates local state, calls `onPinChange` callback
+- Download → calls `exportFiles([file.id])` which downloads a ZIP with single file
+- Delete → shows AlertDialog confirmation, then calls `removeFile()`
+- Open in Engine → shows toast notification (placeholder — no `window.open`, not wired to external URL)
+- Open in INP MAKER → shows toast notification (placeholder — not wired)
+- Run in BatchSWMM → shows toast notification (placeholder — not wired)
+
+**Simulation:**
+- "Run Simulation" button calls `runSwmmSimulation()` from `swmmEngine.ts`
+- Shows simulation report in a Dialog when complete
+
+### 10.3 Sidebar — Navigation & Uploads (567 LOC)
+
+**Navigation Items:**
+```typescript
+[
+  { href: "/",            label: "Dashboard",         icon: LayoutDashboard },
+  { href: "/compare",     label: "Compare Models",    icon: GitCompare },
+  { href: "/ai-analysis", label: "AI Analysis",       icon: BrainCircuit },
+  { href: "/insights",    label: "Database Insights",  icon: BarChart3 },
+  { href: "/reswmm",      label: "ReSWMM",            icon: Scissors },
+  { href: "/settings",    label: "Settings",           icon: Settings },
+]
+```
+
+Each nav item shows description on hover via Tooltip.
+
+**File Upload:**
+- Hidden `<input type="file" accept=".inp,.xp" multiple>` triggered by "Upload Files" button
+- Filters for `.inp`/`.xp` extensions client-side
+
+**Directory Import Flow:**
+1. Hidden `<input type="file" webkitdirectory>` (no `accept` attribute — removed because Windows hides non-matching files)
+2. On selection: client filters for `.inp`/`.xp` files
+3. `showFileSelector` dialog opens listing discovered files
+4. Files sorted by size descending (largest first) for prioritized import
+5. Each file has a checkbox; "Select All" toggle at top
+6. "Import N Files" button sends only checked files to `uploadFiles()`
+7. Directory name extracted from `webkitRelativePath` (first path segment)
+
+**Directory List:**
+- Collapsible section showing each unique directory with file count
+- Each directory has a delete button (with AlertDialog confirmation)
+- Delete removes all files in directory via `removeDirectory()`
+
+**Mobile:**
+- `MobileHeader` component shows hamburger menu icon
+- Sidebar content rendered inside a `Sheet` (slide-out drawer) on mobile
+- Uses `useIsMobile()` hook for breakpoint detection
+
+### 10.4 AI Analysis — Health Scoring Engine (613 LOC)
+
+**Single Model Analysis:**
+1. User selects model from dropdown (populated from FileContext)
+2. Clicks "Analyze" → fetches full content via `getInpFile()`
+3. Runs `analyzeInpFile()` from `inpAnalyzer.ts` (client-side, no server round-trip)
+4. Displays results:
+   - Health score badge (0-100) with color coding (red/yellow/green)
+   - Summary text based on score range
+   - Issues list grouped by severity (Errors → Warnings → Info)
+   - Section completeness in 7 categories with progress bars
+   - Suggestions for improvement
+
+**Health Score Formula (`inpAnalyzer.ts`):**
+```
+score = 100
+score -= errorCount × 15
+score -= warningCount × 5
+score -= infoCount × 1
+score -= (missingSections - 3) × 2    (if > 3 missing)
+score -= 10                            (if no outfalls and has nodes)
+score -= 20                            (if no nodes and no links)
+score = clamp(0, 100)
+```
+
+**Issues Detected:**
+| Category          | Checks                                                           |
+|:-------------------|:----------------------------------------------------------------|
+| Structural Errors  | No outfalls defined, undefined nodes referenced by links, zero-length conduits, zero/negative cross-section geometry |
+| Connectivity       | Orphan nodes (not connected to any link), nodes defined but no links exist |
+| Slope Analysis     | Adverse slopes (upstream invert < downstream invert), near-zero slopes |
+| Manning's n        | Values ≤ 0 or > 0.5 (unusual), values > 0.05 (relatively high) |
+| Missing Sections   | Checks against 13 expected sections: TITLE, OPTIONS, RAINGAGES, SUBCATCHMENTS, SUBAREAS, INFILTRATION, JUNCTIONS, OUTFALLS, CONDUITS, XSECTIONS, COORDINATES, REPORT, MAP |
+
+**Section Categories (7 groups):**
+1. **Core Network**: JUNCTIONS, OUTFALLS, STORAGE, DIVIDERS, CONDUITS, PUMPS, ORIFICES, WEIRS, OUTLETS
+2. **Geometry**: XSECTIONS, TRANSECTS, COORDINATES, VERTICES, MAP, POLYGONS
+3. **Hydrology**: RAINGAGES, SUBCATCHMENTS, SUBAREAS, INFILTRATION, AQUIFERS, GROUNDWATER
+4. **Hydraulics**: OPTIONS, REPORT, LOSSES, CONTROLS, CURVES, TIMESERIES, PATTERNS, DWF, INFLOWS
+5. **Water Quality**: POLLUTANTS, LANDUSES, BUILDUP, WASHOFF, COVERAGES, TREATMENT, LOADINGS
+6. **Green Infrastructure**: LID_CONTROLS, LID_USAGE
+7. **Snow & Climate**: SNOWPACKS, TEMPERATURE, EVAPORATION, ADJUSTMENTS
+
+**Percentile Comparison:**
+```typescript
+function computePercentile(value: number, allValues: number[]): number {
+  const sorted = [...allValues].sort((a, b) => a - b);
+  return Math.round(sorted.filter(v => v < value).length / sorted.length * 100);
+}
+```
+Shows where the analyzed model ranks vs ALL loaded models for nodes, links, and subcatchments.
+
+**Batch Analysis ("Analyze All"):**
+- Iterates through every file sequentially
+- For each: fetches content → runs `analyzeInpFile()` → stores result
+- Progress bar shows `batchProgress / batchTotal`
+- Results table with sortable columns: filename, directory, score, errors, warnings, info
+- Failed files shown with score = -1
+
+### 10.5 Compare Models — Section-Aware Diff (386 LOC)
+
+**File Selection:**
+- Two `<Select>` dropdowns populated by fetching ALL files (paginated loop in `useQuery`)
+- TanStack Query caches the file list
+
+**Diff Algorithm (`lib/diff.ts`, 221 LOC):**
+1. `parseInpSections()` splits content by `[SECTION]` headers
+2. For each section found in either file, computes line-level diff
+3. Outputs `SectionDiff[]` with `hasChanges` flag per section
+4. Each line tagged as `'unchanged'`, `'added'`, or `'removed'`
+
+**Display:**
+- Metadata comparison table (nodes, links, subcatchments side-by-side)
+- Collapsible section-by-section diff (only sections with changes shown by default)
+- Lines color-coded: green for added, red for removed, no background for unchanged
+
+**Markdown Report Export:**
+- `generateMarkdownReport()` builds a full comparison document
+- Includes file metadata table, summary stats (lines added/removed/unchanged, sections changed)
+- Section-by-section diff with `+`/`-` line prefixes
+- Downloaded as `.md` file via blob URL
+
+### 10.6 Insights — Statistical Visualizations (355 LOC)
+
+**Chart Components (all pure CSS, no charting library):**
+
+1. **`BarChartViz`**: Horizontal bars proportional to max value. Shows count + percentage for each bin. Hover opacity effect.
+2. **`DonutChart`**: SVG `<circle>` elements with `strokeDasharray`/`strokeDashoffset` for segments. Center shows total count. Legend shows top 8 entries with color dots.
+3. **`ScatterPlot`**: CSS `position: absolute` dots plotted proportionally. Max 200 dots rendered. Hover shows tooltip via `title` attribute. Displays average links/node ratio.
+
+**Data Source:**
+- Single `useEffect` fetches `/api/insights` on mount
+- Loading state shows spinner with "Analyzing model database..." message
+- 4 stat cards at top: Models, Elements, Conduits, Files Analyzed
+
+### 10.7 ReSWMM — Conduit Discretization (388 LOC frontend, 598 LOC engine)
+
+**Config Interface:**
+```typescript
+interface ReswmmConfig {
+  enabled: boolean;
+  method: 'none' | 'fixed_interval' | 'dx_d_ratio';
+  fixedMinLength: number;   // default: 50
+  fixedMaxLength: number;   // default: 200
+  dxDRatio: number;         // default: 5
+  mnsa: number;             // default: 12.566 (4π ≈ circle area with r=2)
+}
+```
+
+**Config Persistence:**
+```typescript
+const STORAGE_KEY = 'reswmm-config';
+getReswmmConfig()  → reads from localStorage, merges with defaults
+saveReswmmConfig() → writes to localStorage
+```
+
+**UI Elements:**
+- Enable/disable toggle switch
+- Method selector (Fixed Interval vs Δx/D Ratio)
+- Slider controls for min/max length, dx/D ratio, MNSA
+- Per-directory "Apply" buttons with directory file counts
+- Results table showing which files were changed, with stats (original vs new conduit counts, nodes added)
+
+**Engine (`server/reswmm.ts`, 598 LOC):**
+- Algorithm by Robson Leo Pachaly
+- Takes INP content + config → returns `{ changed: boolean, discretizedContent: string, stats: {...} }`
+- Modifies sections: [TITLE], [JUNCTIONS], [CONDUITS], [XSECTIONS], [LOSSES], [COORDINATES]
+- For each conduit exceeding length limits: splits into N segments, creates intermediate junction nodes
+- Junction coordinates interpolated between upstream/downstream nodes
+- New junctions get MNSA (Minimum Nodal Surface Area) parameter
+
+### 10.8 Settings (177 LOC)
+
+**Settings Cards:**
+1. **Dark Mode**: Switch toggle → `useTheme().setDark()`
+2. **Color Theme**: 4 radio buttons with color swatch previews:
+   - EPA: `#3b82f6`, `#1e3a5f` (blue)
+   - UF: `#FA4616`, `#0021A5` (orange/blue)
+   - Oregon State: `#D73F09`, `#000000` (orange/black)
+   - Auburn: `#DD550C`, `#03244D` (orange/navy)
+3. **Notifications**: Upload + Analysis notification toggles (UI only, not persisted)
+4. **Data Management**: Auto-parse on Upload toggle (UI only, not persisted)
+
+---
+
+## 11. Theme System
+
+### CSS Variables (`index.css`)
+Each theme defines: `--background`, `--foreground`, `--primary`, `--primary-foreground`, `--secondary`, `--secondary-foreground`, `--border`, `--ring`, `--muted`, `--muted-foreground`, `--accent`, `--destructive`, `--card`, `--popover`, `--input`, `--sidebar-*` variants.
+
+4 themes × 2 modes = 8 CSS blocks: `.theme-epa`, `.dark.theme-epa`, `.theme-uf`, `.dark.theme-uf`, `.theme-oregon-state`, `.dark.theme-oregon-state`, `.theme-auburn`, `.dark.theme-auburn`
+
+### Anti-Flash Script (inline in `<head>`)
 ```javascript
 try {
   var t = JSON.parse(localStorage.getItem('swmm-theme') || '{}');
   document.documentElement.className = 
     (t.dark !== false ? 'dark' : 'light') + ' theme-' + (t.colorTheme || 'epa');
-} catch(e) { document.documentElement.className = 'dark theme-epa'; }
+} catch(e) { 
+  document.documentElement.className = 'dark theme-epa'; 
+}
+```
+Runs synchronously before any CSS/JS loads. Default: dark mode with EPA theme.
+
+### Runtime (`ThemeContext.tsx`)
+```typescript
+useEffect(() => {
+  root.classList.remove("dark", "light");
+  root.classList.add(dark ? "dark" : "light");
+  root.classList.remove("theme-epa", "theme-uf", "theme-oregon-state", "theme-auburn");
+  root.classList.add(`theme-${colorTheme}`);
+}, [dark, colorTheme]);
 ```
 
 ---
 
-## 11. File Upload & Import Flow
+## 12. INP File Parser (`server/inp-parser.ts`, 189 LOC)
 
-### 11.1 Single File Upload
-1. User clicks "Upload Files" in sidebar
-2. Native file picker opens, filtered to `.inp,.xp` via `accept` attribute
-3. Selected files sent to `POST /api/inp-files/upload` as multipart form data
-4. Server parses each file for metadata, stores content in object storage, creates DB record
-5. Server skips files that already exist (same filename in same directory)
-6. Toast shows results: "X imported, Y duplicates skipped, Z failed"
+**`parseInpFile(content: string)`** — Extracts metadata:
 
-### 11.2 Directory Import
-1. User clicks "Import Directory" in sidebar
-2. Native folder picker opens (no file type filter — removed to prevent OS from hiding `.inp` files on Windows)
-3. Client-side JavaScript filters selected files for `.inp` and `.xp` extensions
-4. Dialog appears listing all found model files with checkboxes, sorted by file size (largest first)
-5. User checks/unchecks individual files, or uses "Select All" toggle
-6. Clicking "Import N Files" uploads only checked files
-7. Same duplicate detection and toast feedback as single upload
-
-### 11.3 State Refresh After Mutations
-- `FileContext.refreshCounter` increments after every upload, delete, or directory removal
-- Dashboard watches `refreshCounter` via `useEffect` to reload stats and quick access
-- This ensures UI updates even when total file count doesn't change (e.g., all duplicates skipped)
-
----
-
-## 12. INP File Parser (`server/inp-parser.ts`) — 189 LOC
-
-Server-side parser that extracts metadata from SWMM5 `.inp` files:
-
-| Count Type      | INP Sections Scanned                                    |
+| Count           | Sections Scanned                                         |
 |:----------------|:---------------------------------------------------------|
-| Node Count      | [JUNCTIONS], [OUTFALLS], [DIVIDERS], [STORAGE]           |
-| Link Count      | [CONDUITS], [PUMPS], [ORIFICES], [WEIRS], [OUTLETS]      |
-| Subcatchment Count | [SUBCATCHMENTS]                                        |
+| nodeCount       | [JUNCTIONS], [OUTFALLS], [DIVIDERS], [STORAGE]           |
+| linkCount       | [CONDUITS], [PUMPS], [ORIFICES], [WEIRS], [OUTLETS]      |
+| subcatchmentCount | [SUBCATCHMENTS]                                        |
 
-Also exports `parseCoordinates()` function that extracts `[COORDINATES]` section data for map visualization (returns `{nodeId, x, y}[]`).
+Counts non-comment, non-empty lines within each section.
 
----
+**`parseCoordinates(content: string)`** — Extracts geometry:
 
-## 13. INP File Analyzer (`client/src/lib/inpAnalyzer.ts`) — 302 LOC
-
-Client-side deep structural analysis engine used by AI Analysis page:
-
-- **Input**: Raw `.inp` file text content
-- **Output**: `{ sectionCategories, stats, healthScore, issues, recommendations }`
-- **Section Detection**: Identifies all `[SECTION]` headers and categorizes into 7 groups
-- **Connectivity Analysis**: Checks for orphan nodes (nodes not referenced by any link)
-- **Slope Analysis**: Calculates conduit slopes, flags adverse slopes and zero-slope conduits
-- **Manning's n Validation**: Checks roughness coefficients against typical engineering ranges
-- **Health Scoring**: Weighted formula producing 0-100 score
-- **Percentile Comparison**: Ranks model's node/link/subcatchment counts against all loaded models
+| Data Type     | Section Parsed     | Output                                        |
+|:-------------|:-------------------|:----------------------------------------------|
+| Node positions | [COORDINATES]    | `{ id, x, y }[]`                              |
+| Link vertices  | [VERTICES]       | `{ id, vertices: {x, y}[] }[]`                |
+| Subcatchment polygons | [POLYGONS] | `{ id, vertices: {x, y}[] }[]`               |
+| Link connections | [CONDUITS], [PUMPS], [ORIFICES], [WEIRS], [OUTLETS] | `{ id, fromNode, toNode }[]` |
 
 ---
 
-## 14. SWMM Simulation Engine (`client/src/lib/swmmEngine.ts`) — 290 LOC
+## 13. File Context (`client/src/context/FileContext.tsx`, 93 LOC)
 
-Client-side integration with the external SWMM simulation API:
-
-- Sends `.inp` file content to `https://swmm-engine--robertdickinson.replit.app/api/simulate`
-- Receives simulation results (continuity errors, warnings, outfall flows)
-- Also includes WebAssembly SWMM integration hooks for potential in-browser simulation
-
----
-
-## 15. Build System
-
-### Development
-```bash
-npm run dev
+```typescript
+interface FileContextType {
+  files: InpFile[];                                    // all loaded files
+  loading: boolean;                                     // initial load in progress
+  error: string | null;                                 // last error message
+  uploadFiles(files: File[], dir?: string): Promise<UploadResult>;
+  removeFile(id: string): Promise<void>;
+  removeDirectory(directory: string): Promise<void>;
+  refreshFiles(): Promise<void>;
+  refreshCounter: number;                               // increments after every mutation
+}
 ```
-- Runs `NODE_ENV=development tsx server/index.ts`
-- Express server with Vite dev server as middleware (HMR on port 5000)
-- Both frontend and backend hot-reload on file changes
 
-### Production Build
-```bash
-npm run build    # Build frontend + backend
-npm run start    # NODE_ENV=production node dist/index.cjs
-```
-- `script/build.ts` orchestrates:
-  - Vite builds frontend → `dist/public/`
-  - esbuild bundles backend → `dist/index.cjs`
-
-### All Scripts
-| Script           | Command                               | Purpose                           |
-|:-----------------|:--------------------------------------|:----------------------------------|
-| `npm run dev`    | `NODE_ENV=development tsx server/index.ts` | Start development server     |
-| `npm run build`  | `tsx script/build.ts`                 | Production build                  |
-| `npm run start`  | `NODE_ENV=production node dist/index.cjs` | Start production server      |
-| `npm run check`  | `tsc`                                 | TypeScript type checking          |
-| `npm run db:push`| `drizzle-kit push`                    | Push schema changes to PostgreSQL |
+**Behavior:**
+- `refreshFiles()` calls `getAllInpFilesFlat()` (paginated loop) and sets `files` state
+- `uploadFiles()` calls API, refreshes files, increments `refreshCounter`
+- `removeFile()` optimistically removes from local state, increments `refreshCounter`
+- `removeDirectory()` optimistically removes all files in directory, increments `refreshCounter`
+- Dashboard watches `refreshCounter` to reload stats and quick access (not `files.length`, since all-duplicate imports don't change count)
 
 ---
 
-## 16. External Dependencies
+## 14. Build & Development
 
-### Core Infrastructure
-| Package                | Purpose                                              |
-|:-----------------------|:-----------------------------------------------------|
-| `pg`                   | PostgreSQL client driver                             |
-| `drizzle-orm`          | Type-safe ORM for database queries                   |
-| `drizzle-zod`          | Zod schema generation from Drizzle schemas           |
-| `drizzle-kit`          | Database migration/push tooling                      |
-| `@google-cloud/storage`| Replit Object Storage (GCS backend) client           |
+### Scripts
+| Command           | What It Does                                                |
+|:------------------|:------------------------------------------------------------|
+| `npm run dev`     | `NODE_ENV=development tsx server/index.ts` — starts Express + Vite middleware (port 5000) |
+| `npm run build`   | `tsx script/build.ts` — Vite builds frontend → `dist/public/`, esbuild bundles backend → `dist/index.cjs` |
+| `npm run start`   | `NODE_ENV=production node dist/index.cjs` — serves built frontend + API |
+| `npm run check`   | `tsc` — TypeScript type checking                           |
+| `npm run db:push` | `drizzle-kit push` — pushes schema changes to PostgreSQL    |
+
+### Path Aliases (tsconfig.json)
+```json
+{ "@shared": "shared/", "@assets": "attached_assets/" }
+```
+
+---
+
+## 15. Environment Variables
+
+| Variable                           | Purpose                                      |
+|:-----------------------------------|:---------------------------------------------|
+| `DATABASE_URL`                     | PostgreSQL connection string                 |
+| `DEFAULT_OBJECT_STORAGE_BUCKET_ID` | GCS bucket identifier                        |
+| `PUBLIC_OBJECT_SEARCH_PATHS`       | Object storage public paths                  |
+| `PRIVATE_OBJECT_DIR`               | Object storage private directory             |
+
+---
+
+## 16. Key Conventions & Gotchas
+
+| Convention                | Detail                                                                     |
+|:--------------------------|:---------------------------------------------------------------------------|
+| API file list shape       | Always `{ files: [...], total, limit, offset, hasMore }` — extract `.files` |
+| `size` field formatting   | API returns formatted string ("2.45 MB"), not raw bytes                    |
+| Date formatting           | `lastModified` returns ISO date string "2024-03-15", not full timestamp    |
+| refreshCounter pattern    | Dashboard watches `refreshCounter`, not `files.length`, for stat refresh   |
+| Directory input           | No `accept` attribute on directory picker (Windows hides files otherwise)  |
+| Single file input         | Uses `accept=".inp,.xp"` for file type filtering                          |
+| Duplicate detection       | Server-side by filename within same directory (Set lookup)                 |
+| Import sort order         | File selector sorts by size descending (largest first)                     |
+| Directory header nesting  | Uses `<div role="button">` to avoid nested `<button>` HTML errors         |
+| Insights cache            | Server-side, 5-min TTL, module-level variable, no invalidation logic beyond TTL |
+| ReSWMM skip pattern       | Files ending in `_Disc.inp` are skipped when applying ReSWMM              |
+| Theme localStorage key    | `swmm-theme` → `{ dark: boolean, colorTheme: string }`                   |
+| ReSWMM localStorage key   | `reswmm-config` → full `ReswmmConfig` object                             |
+| Default theme             | Dark mode + EPA theme (blue)                                              |
+| Default ReSWMM            | Disabled, fixed_interval, min=50, max=200, dxD=5, mnsa=12.566            |
+| Content search limit      | Returns up to 5 matching lines per file                                   |
+| Insights batch size       | Downloads content from Object Storage in batches of 20 (Promise.allSettled)|
+| Insights max files        | Up to 2000 files processed                                               |
+| Compare file loading      | CompareModels fetches ALL files via paginated loop in useQuery             |
+| Batch analysis            | Sequential (one file at a time), shows live progress                      |
+| Export filename pattern   | `swmm5-export-{timestamp}.zip` or `{directory}-{timestamp}.zip`           |
+| Simulation endpoint       | External: `https://swmm-engine--robertdickinson.replit.app/api/simulate`  |
+| Score -1 in batch         | Indicates analysis failed for that file                                   |
+
+---
+
+## 17. External Dependencies (Complete List)
+
+### Infrastructure
+`pg`, `drizzle-orm`, `drizzle-zod`, `drizzle-kit`, `@google-cloud/storage`
 
 ### Frontend
-| Package                    | Purpose                                          |
-|:---------------------------|:-------------------------------------------------|
-| `react` / `react-dom`     | UI framework (v19)                               |
-| `wouter`                  | Client-side routing                              |
-| `@tanstack/react-query`   | Server state management and caching              |
-| `@radix-ui/react-*`       | 20+ accessible UI primitives (dialog, dropdown, tabs, checkbox, etc.) |
-| `framer-motion`           | Animation library                                |
-| `lucide-react`            | Icon library                                     |
-| `tailwind-merge`          | Tailwind class merging utility                   |
-| `class-variance-authority`| Component variant management (cva)               |
-| `date-fns`               | Date formatting                                  |
-| `recharts`               | Chart library (available, not used by Insights)  |
-| `react-resizable-panels`  | Resizable split panes                            |
-| `cmdk`                   | Command palette component                        |
-| `embla-carousel-react`    | Carousel component                               |
-| `react-hook-form`         | Form state management                            |
-| `@hookform/resolvers`     | Zod resolver for react-hook-form                 |
+`react` (v19), `react-dom`, `wouter`, `@tanstack/react-query`, 20+ `@radix-ui/react-*` packages, `framer-motion`, `lucide-react`, `tailwind-merge`, `class-variance-authority`, `date-fns`, `recharts` (available but unused), `react-resizable-panels`, `cmdk`, `embla-carousel-react`, `react-hook-form`, `@hookform/resolvers`
 
 ### Backend
-| Package                    | Purpose                                          |
-|:---------------------------|:-------------------------------------------------|
-| `express`                  | HTTP server framework                            |
-| `multer`                   | Multipart file upload handling (200 MB limit)    |
-| `archiver`                 | ZIP archive creation for exports                 |
-| `express-session`          | Session middleware (available, not actively used) |
-| `connect-pg-simple`        | PostgreSQL session storage (available)           |
-| `passport` / `passport-local` | Authentication (available, not actively used) |
-| `memorystore`              | In-memory session store (available)              |
+`express`, `multer` (200 MB limit), `archiver` (ZIP level 9), `express-session`, `connect-pg-simple`, `passport`, `passport-local`, `memorystore`
 
-### Development
-| Package                                   | Purpose                              |
-|:------------------------------------------|:-------------------------------------|
-| `vite`                                    | Frontend build tool with HMR         |
-| `tsx`                                     | TypeScript execution for dev server  |
-| `esbuild`                                | Production backend bundling          |
-| `typescript`                              | Type checking                        |
-| `@replit/vite-plugin-runtime-error-modal` | Error overlay in development         |
-| `@replit/vite-plugin-cartographer`        | Replit development tooling           |
-| `@replit/vite-plugin-dev-banner`          | Dev environment indicator banner     |
+### Dev
+`vite`, `tsx`, `esbuild`, `typescript`, `@replit/vite-plugin-runtime-error-modal`, `@replit/vite-plugin-cartographer`, `@replit/vite-plugin-dev-banner`
 
 ---
 
-## 17. Environment Variables
+## 18. Installed Integrations
 
-| Variable                           | Purpose                                           | Source         |
-|:-----------------------------------|:--------------------------------------------------|:---------------|
-| `DATABASE_URL`                     | PostgreSQL connection string                      | Replit DB      |
-| `DEFAULT_OBJECT_STORAGE_BUCKET_ID` | Replit Object Storage bucket identifier           | Replit secret  |
-| `PUBLIC_OBJECT_SEARCH_PATHS`       | Public asset search paths in object storage       | Replit secret  |
-| `PRIVATE_OBJECT_DIR`               | Private object directory path in storage          | Replit secret  |
+| Integration                    | Version | Purpose                              |
+|:-------------------------------|:--------|:-------------------------------------|
+| `javascript_database`          | 1.0.0   | PostgreSQL database                  |
+| `javascript_object_storage`    | 1.0.0   | Replit Object Storage (GCS)          |
 
 ---
 
-## 18. Key Patterns & Conventions
+## 19. Ecosystem Links (External Apps)
 
-### API Response Shapes
-- **File lists**: `{files: [...], total, limit, offset, hasMore}` — always extract `.files` property
-- **Upload response**: `{files: [...], count, failed: [...], failedCount, skipped: [...], skippedCount}`
-- **Stats response**: includes `inpCount` and `xpCount` for file type breakdown
-- **File detail**: Single file GET returns content + coordinates for map rendering
-
-### State Management Patterns
-- `FileContext` provides: `files`, `loading`, `error`, `uploadFiles()`, `removeFile()`, `removeDirectory()`, `refreshFiles()`, `refreshCounter`
-- Dashboard watches `refreshCounter` (not `files.length`) to reload stats — handles edge cases like all-duplicate imports
-- `ThemeContext` provides: `darkMode`, `colorTheme`, `setDarkMode()`, `setColorTheme()`
-
-### localStorage Keys
-| Key            | Shape                                     | Used By          |
-|:---------------|:------------------------------------------|:-----------------|
-| `swmm-theme`   | `{colorTheme: string, dark: boolean}`     | ThemeContext      |
-| ReSWMM config  | `{method, fixedMinLength, fixedMaxLength, dxDRatio, MNSA}` | ReSWMM page |
-
-### File Format Support
-- Both `.inp` (SWMM5) and `.xp` (XPSWMM) accepted everywhere
-- Server filter: `f.originalname.toLowerCase().endsWith('.inp') || .endsWith('.xp')`
-- Client single-file input: `accept=".inp,.xp"`
-- Client directory input: **no `accept` attribute** (prevents OS from hiding files)
-
-### Duplicate Prevention
-- Server-side: before upload, fetches all existing files in target directory, builds `Set` of filenames
-- Matching filenames are skipped (not overwritten), reported back to client
-
-### HTML Nesting Convention
-- Directory collapse headers use `<div role="button">` (not `<button>`) to avoid nested `<button>` HTML validation errors when action buttons exist inside the header
-
-### Insights Caching
-- Server-side module-level variable with 5-minute TTL
-- Cache invalidates when total file count changes (files added or removed)
+| App              | URL                                                   | Integration Level  |
+|:-----------------|:------------------------------------------------------|:-------------------|
+| SWMM Engine      | `swmm-engine--robertdickinson.replit.app`             | API endpoint exists in backend (`/api/simulate/:id`); FileCard uses client-side WASM simulation via `swmmEngine.ts` instead |
+| INP MAKER        | External tool                                         | Toast placeholder only (no URL wired) |
+| BatchSWMM        | External tool                                         | Toast placeholder only (no URL wired) |
 
 ---
 
-## 19. Installed Integrations
-
-| Integration                    | Version | Notes                                        |
-|:-------------------------------|:--------|:---------------------------------------------|
-| `javascript_database`          | 1.0.0   | PostgreSQL database integration              |
-| `javascript_object_storage`    | 1.0.0   | Replit Object Storage integration            |
-
----
-
-## 20. External App Integrations (Ecosystem Links)
-
-FileCard dropdown includes links to related SWMM tools (opened in new browser tabs):
-
-| App              | URL Pattern                                           | Purpose                    |
-|:-----------------|:------------------------------------------------------|:---------------------------|
-| SWMM Engine      | `swmm-engine--robertdickinson.replit.app`             | Hydraulic simulation       |
-| INP MAKER        | External INP file creation tool                       | Model building/editing     |
-| BatchSWMM        | Batch simulation runner                               | Multi-model simulation     |
-
-Currently these are simple links — no data is transferred between apps via postMessage or API calls.
-
----
-
-## 21. Current Model Library Statistics
+## 20. Model Library Statistics
 
 | Metric              | Value                |
 |:---------------------|:---------------------|
@@ -698,307 +1070,69 @@ Currently these are simple links — no data is transferred between apps via pos
 
 ---
 
-## 22. Git History (Key Milestones)
+## 21. Git History (Key Milestones)
 
 | Commit    | Description                                                     |
 |:----------|:----------------------------------------------------------------|
-| `95d9153` | Update documentation with project grading and improvement ideas |
-| `1859073` | Create comprehensive handover document                          |
-| `60ca370` | Add support for managing and viewing XP files alongside INP     |
-| `3ceacb2` | Sort imported files by size in sidebar view                     |
-| `5a4a174` | Add ability to import .xp files alongside .inp model files      |
-| `d65f6a0` | Prevent duplicate file uploads and improve import feedback      |
-| `4180d9b` | Update file counts after folder imports                         |
-| `bf4c92e` | Update project name to SWMM5 Network Miner everywhere          |
-| `d0e0ec3` | Improve directory upload to allow selecting specific files      |
-| `73224ff` | Add comprehensive analysis and comparison features              |
-| `a88e87c` | Make dashboard directory sections collapsible                   |
-| `c1157e1` | Add new theme options (dark mode, university color schemes)     |
-| `f563e3c` | Add database insights and improve AI analysis                   |
-| `2cdc4c9` | Move ReSWMM tool to its own dedicated section                   |
-| `7419325` | Add conduit discretization tool (ReSWMM)                        |
+| `95d9153` | Documentation: grading and improvement ideas                    |
+| `60ca370` | Add .xp (XPSWMM) file format support                           |
+| `d65f6a0` | Server-side duplicate detection + import feedback               |
+| `bf4c92e` | Rename app to "SWMM5 Network Miner" everywhere                 |
+| `d0e0ec3` | Directory upload with selective file picker                     |
+| `73224ff` | Compare Models + expanded AI Analysis                           |
+| `a88e87c` | Collapsible directory sections                                  |
+| `c1157e1` | Multi-theme support (EPA, UF, Oregon State, Auburn)             |
+| `f563e3c` | Database Insights + improved AI Analysis                        |
+| `7419325` | ReSWMM conduit discretization tool                              |
 
 ---
 
-## 23. Grading & Scoring Breakdown
-
-**Overall Grade: A / 92 out of 100**
+## 22. Grading — A / 92 out of 100
 
 ```
 Content & Data                ██████████  97
-  1,000+ models, 18 directories, 220K nodes, 226K links, 70K subcatchments
-  .inp AND .xp format support
-
 Core Functionality            █████████░  95
-  18 REST API endpoints, full CRUD with duplicate detection
-  Content search with line-number highlighting, ZIP export via Archiver
-
 Analysis & Intelligence       █████████░  93
-  AI health scoring (0-100), batch analysis across all models
-  7-category section completeness, slope/connectivity/Manning's n validation
-
 Statistical Insights          █████████░  94
-  6 interactive charts (pure CSS), ALL files analyzed (no sampling limit)
-  5-minute server-side cache
-
 Visualization                 █████████░  90
-  SVG network maps with zoom/pan, Minecraft-style voxel maps (multiple biomes)
-
 Model Comparison              █████████░  91
-  Section-aware diff with highlighting, markdown report export
-
 Architecture                  █████████░  92
-  PostgreSQL + Drizzle ORM, Replit Object Storage (GCS)
-  Proper file/metadata separation, anti-flash theme script
-
 Ecosystem Integration         ████████░░  82
-  Links to Engine, INP MAKER, BatchSWMM — but no deep data flow between apps
-
 UI / UX                       █████████░  88
-  4 color themes + dark mode, collapsible directories
-  Pin/recent quick access, responsive with mobile sidebar
 ```
 
 ---
 
-## 24. Improvement Ideas (10 Features to Reach A+)
-
-### Idea 1: "Model Timeline" — Track Changes Over Time
-
-**Concept**: When users upload multiple versions of the same model, show how it evolved over time.
-
-**What it does**:
-- Detects version groups by filename similarity (strips `_v1`, `_rev2`, `_20240315` suffixes)
-- Shows timeline with node/link/subcatchment counts at each version
-- Auto-diffs between consecutive versions
-- Health score trend chart showing improvement over time
-- "What changed" summary (e.g., "+44 new junctions, +5 LID controls, health: 68 → 82")
-
-**Implementation approach**:
-- Group files by base name (strip version/date suffixes with regex)
-- Sort each group by `createdAt` date
-- For each version group, compute deltas between consecutive versions
-- New page or Dashboard section: clickable timeline with compare links
-
-**Effort**: ~2 weeks | **Impact**: +2 points
-
----
-
-### Idea 2: "Smart Recommendations" — AI-Powered Auto-Fix
-
-**Concept**: After AI Analysis identifies issues, generate SPECIFIC actionable recommendations with "Fix It" buttons that modify file content directly.
-
-**Current behavior**: "12 conduits have adverse slopes" (just a count)
-
-**Improved behavior**:
-- Lists each problematic element by name with exact values (e.g., "C-42: US invert 95.2 > DS invert 95.8")
-- Shows what the fix would be (e.g., "Swap upstream/downstream inverts")
-- "Auto-Fix All" buttons that modify file content directly via `PUT /api/inp-files/:id/content`
-- Estimated health score improvement after all fixes (e.g., "72 → 89, +17 points")
-
-**Auto-fix examples**:
-- **Adverse slopes**: Swap upstream/downstream node inverts
-- **Orphan nodes**: Remove disconnected nodes or auto-connect to nearest downstream
-- **High Manning's n**: Suggest standard values based on pipe material
-- **Missing sections**: Generate template sections via INP MAKER integration
-
-**Effort**: ~2 weeks | **Impact**: +2 points
-
----
-
-### Idea 3: "Model Quality Leaderboard" — Gamified Health Tracking
-
-**Concept**: Rank all 1,000+ models by health score with directory-level averages.
-
-**What it shows**:
-- Top 10 healthiest models with score bars
-- Bottom 10 models needing attention
-- Directory rankings by average health score
-- Overall library health score
-- Health distribution chart
-- CSV export of rankings
-
-**Implementation approach**:
-- Add `health_score INTEGER` column to `inp_files` table
-- Store score after each AI analysis run
-- Leaderboard page: `SELECT * FROM inp_files WHERE health_score IS NOT NULL ORDER BY health_score DESC`
-- Directory averages: `SELECT directory, AVG(health_score) FROM inp_files GROUP BY directory`
-
-**Effort**: ~2 weeks | **Impact**: +1 point
-
----
-
-### Idea 4: "Cross-Model Pattern Search"
-
-**Concept**: Search for specific engineering PATTERNS across all 1,000+ models, not just text.
-
-**What it does**:
-- Filter models by characteristics: "Has pumps AND uses Green-Ampt AND more than 100 conduits"
-- Shows common patterns across matching models (e.g., "89% use DYNWAVE routing")
-- Preset searches: "Models with LID", "Models with pumps", "Combined sewers", "Large models (>500 nodes)", "Models with adverse slopes"
-
-**Implementation approach**:
-- Build structured search index per model from parsed content:
-  - Boolean flags: `hasPumps`, `hasLID`, `hasWQ`, `hasSnow` (from section presence)
-  - Extracted options: `routing`, `infiltration`, `flowUnits` (from [OPTIONS] section)
-  - Already in DB: `nodeCount`, `linkCount`
-- Store index in new table or JSON column
-- Query with combinable AND/OR filters
-
-**Effort**: ~1-2 weeks | **Impact**: +2 points
-
----
-
-### Idea 5: "Ecosystem Data Flow" — Send Models to Other Apps
-
-**Concept**: Replace simple external links with actual data transfer to other SWMM apps via `window.postMessage`.
-
-**Current**: FileCard dropdown has links to Engine, INP MAKER, BatchSWMM — just URLs, no data transfer.
-
-**Improved**:
-- "Open in SWMM5 Engine" → opens Engine window and sends model content via `postMessage({type:'load_model', filename, inp: content})`
-- "Enhance in INP MAKER" → opens INP MAKER with model pre-loaded
-- "Run in BatchSWMM" → sends multiple selected files for batch simulation
-
-**New ecosystem actions**:
-- "Get Rainfall" → Open Rain Canvas with model's geographic location
-- "See Algorithms" → Open Rosetta Stone for relevant SWMM modules
-- "Analyze Repository" → Open Repo Insights for pyswmm
-- "Compare with SWMManywhere" → Generate model for same area
-
-**Effort**: ~1-2 days per app connection | **Impact**: +2 points
-
----
-
-### Idea 6: "Model Similarity Finder"
-
-**Concept**: Select any model → find the most similar models in the 1,000+ library.
-
-**Similarity dimensions**:
-- **Size**: node/link/subcatchment count comparison
-- **Type**: sections present (LID, WQ, Snow, pumps, etc.)
-- **Complexity**: links/node ratio, max pipe diameter
-- **Parameters**: Manning's n distribution, slope patterns
-- **Structure**: cross-section shape distribution, offset patterns
-
-**Implementation approach**:
-- Compute similarity score (0-100%) using weighted normalized distances
-- `sizeSim = 1 - |countA - countB| / max(countA, countB)`
-- `sectionSim = jaccard(sectionsA, sectionsB)`
-- Weighted average: 30% size + 30% links + 20% sections + 20% complexity
-- "Compare Side-by-Side" link for each similar model result
-
-**Effort**: ~1-2 weeks | **Impact**: +1 point
-
----
-
-### Idea 7: Enhanced Minecraft Maps — Interactive Voxel World
-
-**Concept**: The MinecraftMap component (1,136 LOC) is already the most unique feature. Enhance it into a full interactive experience.
-
-**Enhancements**:
-- Click interactions on nodes/pipes (popup with properties: depth, elevation, diameter, length, slope)
-- Pipe thickness proportional to actual diameter (visual scaling)
-- Color coding options: by diameter, slope, Manning's n, or flow direction
-- New "Neon" cyberpunk theme (dark background, glowing pipes)
-- Export as high-res PNG for engineering reports
-- 3D isometric view option
-- Rotate view button
-
-**Effort**: ~1-2 weeks | **Impact**: +1 point (most unique visualization in any SWMM tool)
-
----
-
-### Idea 8: "Batch ReSWMM with Results Comparison"
-
-**Concept**: After ReSWMM creates `_Disc.inp` files, automatically run both original and discretized through SWMM simulation and show the improvement.
-
-**What it shows**:
-- Table: Model name | Original Continuity Error | Discretized CE | Delta %
-- Average CE improvement across all models in directory
-- Count of models brought below 1% CE threshold
-- Before/after comparison chart
-- Download all discretized models as ZIP
-
-**Implementation approach**:
-- After ReSWMM creates `_Disc.inp` files, send both original and discretized to external SWMM engine (`POST /api/simulate/:id` already exists)
-- Parse continuity errors from simulation results
-- Display comparison table with color-coded improvements (green = better, red = worse)
-
-**Effort**: ~1-2 weeks | **Impact**: +2 points
-
----
-
-### Idea 9: "Model Usage Analytics"
-
-**Concept**: Track which models are viewed, analyzed, compared, and downloaded most.
-
-**What it shows**:
-- Most viewed models (last 30 days)
-- Most analyzed models
-- Most compared model pairs
-- Most downloaded models
-- Daily activity sparkline chart
-
-**Implementation approach**:
-- New database table: `model_events (id SERIAL, file_id VARCHAR REFERENCES inp_files(id), event_type TEXT, created_at TIMESTAMP DEFAULT NOW())`
-- Event types: `view`, `analyze`, `compare`, `download`, `simulate`
-- Log events in each relevant API route handler
-- Aggregate queries for analytics dashboard
-- Already tracking `lastAccessedAt` — extend with full event history
-
-**Effort**: ~1-2 weeks | **Impact**: +1 point
-
----
-
-### Idea 10: "WASM Simulation Dashboard"
-
-**Concept**: Run SWMM via WebAssembly in the browser for instant model validation without server round-trips.
-
-**What it does**:
-- Quick 1-hour simulation runs entirely in browser (~2-3 seconds)
-- Results: status, routing CE, runoff CE, warnings, flooding nodes, peak outfall flow
-- "View Full Report" for detailed simulation output
-- "Fix Issues & Re-Run" workflow
-- Batch validation: "Validate All with WASM" runs quick sim on every model
-- Model cards show validation badge: Validated | Warnings | Failed
-
-**Note**: `client/src/lib/swmmEngine.ts` (290 LOC) already exists with WebAssembly hooks.
-
-**Effort**: ~2-3 weeks | **Impact**: +2 points
-
----
-
-## 25. Priority Ranking for Improvements
+## 23. Improvement Roadmap (10 Ideas)
 
 ### Fastest to Implement
-| Priority | Feature                          | Effort     | Impact  |
-|:---------|:---------------------------------|:-----------|:--------|
-| 1        | Ecosystem Data Flow (#5)         | 1-2 days   | +2 pts  |
-| 2        | Model Quality Leaderboard (#3)   | 2 weeks    | +1 pt   |
-| 3        | Usage Analytics (#9)             | 1-2 weeks  | +1 pt   |
+| # | Feature                     | Effort    | Impact |
+|:--|:----------------------------|:----------|:-------|
+| 5 | Ecosystem Data Flow (postMessage to other apps) | 1-2 days | +2 pts |
+| 3 | Model Quality Leaderboard (store health_score in DB) | 2 weeks | +1 pt |
+| 9 | Usage Analytics (model_events table) | 1-2 weeks | +1 pt |
 
 ### Highest Value
-| Priority | Feature                          | Effort     | Impact  |
-|:---------|:---------------------------------|:-----------|:--------|
-| 4        | Smart Recommendations (#2)       | 2 weeks    | +2 pts  |
-| 5        | Cross-Model Pattern Search (#4)  | 1-2 weeks  | +2 pts  |
-| 6        | Batch ReSWMM Comparison (#8)     | 1-2 weeks  | +2 pts  |
-| 7        | Model Timeline (#1)              | 2 weeks    | +2 pts  |
+| # | Feature                     | Effort    | Impact |
+|:--|:----------------------------|:----------|:-------|
+| 2 | Smart Recommendations with Auto-Fix buttons | 2 weeks | +2 pts |
+| 4 | Cross-Model Pattern Search (section-based index) | 1-2 weeks | +2 pts |
+| 8 | Batch ReSWMM with CE Comparison (run both original + discretized) | 1-2 weeks | +2 pts |
+| 1 | Model Timeline (version detection + evolution tracking) | 2 weeks | +2 pts |
 
 ### Unique / Fun
-| Priority | Feature                          | Effort     | Impact  |
-|:---------|:---------------------------------|:-----------|:--------|
-| 8        | Minecraft Map Enhancements (#7)  | 1-2 weeks  | +1 pt   |
-| 9        | Model Similarity Finder (#6)     | 1-2 weeks  | +1 pt   |
-| 10       | WASM Simulation Dashboard (#10)  | 2-3 weeks  | +2 pts  |
+| # | Feature                     | Effort    | Impact |
+|:--|:----------------------------|:----------|:-------|
+| 7 | Interactive Minecraft Maps (click popups, color coding, PNG export) | 1-2 weeks | +1 pt |
+| 6 | Model Similarity Finder (weighted distance scoring) | 1-2 weeks | +1 pt |
+| 10| WASM Simulation Dashboard (browser-side validation) | 2-3 weeks | +2 pts |
 
 ### Fast Path to A+ (96+)
-Ecosystem Flow + Smart Recommendations + Pattern Search + Leaderboard = ~5-6 weeks → +7 points → 99
+#5 + #2 + #4 + #3 = ~5-6 weeks → +7 points → 99
 
 ---
 
-## 26. Suite Rankings (Current Standing)
+## 24. Suite Rankings
 
 ```
  #1   SWMM5 Rosetta Stone          A+ (100)
